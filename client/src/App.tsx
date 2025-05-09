@@ -418,6 +418,7 @@ function AddTokenForm({ ws }: { ws: WebSocket | null }) {
           fontSize: 16,
           cursor: "pointer",
         }}
+        data-cy="add-token-btn"
       >
         Добавить
       </button>
@@ -736,6 +737,7 @@ function MapUploadAndView({ isGM, mapUrl, setMapUrl, ws, clientId }: { isGM: boo
             style={{ display: "none" }}
             ref={fileInputRef}
             onChange={handleFileChange}
+            data-cy="upload-map-input"
           />
           <button
             onClick={() => fileInputRef.current?.click()}
@@ -751,6 +753,7 @@ function MapUploadAndView({ isGM, mapUrl, setMapUrl, ws, clientId }: { isGM: boo
               cursor: uploading ? "not-allowed" : "pointer",
               marginRight: 12,
             }}
+            data-cy="upload-map-btn"
           >
             {uploading ? "Загрузка..." : "Загрузить карту (PNG/JPG)"}
           </button>
@@ -780,9 +783,10 @@ function MapUploadAndView({ isGM, mapUrl, setMapUrl, ws, clientId }: { isGM: boo
           onMouseDown={handleMouseDown}
           onMousemove={handleMouseMove}
           onMouseup={handleMouseUp}
+          data-cy="map-stage"
         >
           <Layer>
-            <KonvaImage image={image} x={0} y={0} />
+            <KonvaImage image={image} x={0} y={0} data-cy="map-image" />
             {gridLines}
             {/* Токены */}
             {tokens.map((t) => (
@@ -798,6 +802,9 @@ function MapUploadAndView({ isGM, mapUrl, setMapUrl, ws, clientId }: { isGM: boo
                     const pos = e.target.position();
                     sendMoveThrottled(t.id, Math.round(pos.x), Math.round(pos.y));
                   }}
+                  data-cy="token"
+                  data-x={t.x}
+                  data-y={t.y}
                 />
                 <KonvaText
                   x={t.x - 20}
@@ -878,7 +885,7 @@ function Chat({ ws, clientId }: { ws: WebSocket | null; clientId: string }) {
 
   return (
     <div style={{ ...parchment, minWidth: 320, maxWidth: 400, display: "flex", flexDirection: "column", height: 400 }}>
-      <div ref={logRef} style={{ flex: 1, overflowY: "auto", marginBottom: 8 }}>
+      <div ref={logRef} style={{ flex: 1, overflowY: "auto", marginBottom: 8 }} data-cy="chat-log">
         {messages.map((m, i) => (
           <div key={i} style={{ marginBottom: 4 }}>
             <b style={{ color: m.user === clientId ? accent : "#333" }}>{m.user}:</b> {m.text}
@@ -892,6 +899,7 @@ function Chat({ ws, clientId }: { ws: WebSocket | null; clientId: string }) {
           onKeyDown={e => e.key === "Enter" && send()}
           style={{ flex: 1, padding: 8, borderRadius: 6, border: "1.5px solid #b08968", fontSize: 16 }}
           placeholder="Сообщение или /roll 2d6+1"
+          data-cy="chat-input"
         />
         <button onClick={send} style={{ background: accent, color: "#fff", border: "none", borderRadius: 8, padding: "8px 18px", fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>Отправить</button>
       </div>
@@ -984,6 +992,7 @@ function App() {
               width: 220,
             }}
             disabled={connected}
+            data-cy="session-id-input"
           />
           <button
             onClick={handleConnect}
@@ -998,8 +1007,34 @@ function App() {
               fontSize: 20,
               cursor: connected ? "not-allowed" : "pointer",
             }}
+            data-cy="connect-btn"
           >
             {connected ? "Подключено" : "Подключиться"}
+          </button>
+          <button
+            onClick={async () => {
+              // Создать новую комнату через backend
+              const resp = await fetch("http://127.0.0.1:8000/rooms", { method: "POST" });
+              const data = await resp.json();
+              if (data.slug) {
+                setSessionId(data.slug);
+                setTimeout(() => handleConnect(), 100); // Подключиться автоматически
+              }
+            }}
+            disabled={connected}
+            style={{
+              background: accentHover,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 28px",
+              fontWeight: "bold",
+              fontSize: 20,
+              cursor: connected ? "not-allowed" : "pointer",
+            }}
+            data-cy="create-room-btn"
+          >
+            Создать комнату
           </button>
           {connected && (
             <span

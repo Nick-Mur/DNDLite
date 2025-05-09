@@ -9,6 +9,9 @@ import json
 import uuid
 import hashlib
 import random
+import motor.motor_asyncio
+import asyncio
+import time
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
@@ -27,6 +30,26 @@ app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 # --- Глобальный чат лог (500 строк) ---
 chat_log = []
 
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
+mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
+db = mongo_client["dndlite"]
+rooms_col = db["rooms"]
+assets_col = db["assets"]
+room_states_col = db["room_states"]
+roll_logs_col = db["roll_logs"]
+
+# TTL-индекс на room_states (24ч)
+async def ensure_ttl():
+    await room_states_col.create_index("createdAt", expireAfterSeconds=86400)
+asyncio.get_event_loop().create_task(ensure_ttl())
+
+# --- Хелперы для сохранения/загрузки состояния ---
+async def save_room_state(session_id, state):
+    await room_states_col.replace_one({"_id": session_id}, {"_id": session_id, "createdAt": asyncio.get_event_loop().time(), "state": state}, upsert=True)
+async def load_room_state(session_id):
+    doc = await room_states_col.find_one({"_id": session_id})
+    return doc["state"] if doc else None
+
 @app.get("/")
 def read_root():
     logger.info("GET / запрос получен")
@@ -35,6 +58,16 @@ def read_root():
 @app.websocket("/ws/game/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
+    # При подключении пытаемся загрузить состояние из Mongo
+    loaded = await load_room_state(session_id)
+    if loaded:
+        session = session_manager.get_or_create(session_id)
+        # Восстанавливаем map, tokens, log, dice_history, fog и т.д.
+        session.map = MapState(**loaded.get("map", {}))
+        session.tokens = {t["id"]: Token(**t) for t in loaded.get("tokens", [])}
+        session.action_log = loaded.get("action_log", [])
+        session.dice_history = [DiceRoll(**d) for d in loaded.get("dice_history", [])]
+        session.state = loaded.get("state", {})
     # Ждём client_id первым сообщением
     data = await websocket.receive_text()
     logger.info(f"[DEBUG] Получено первое сообщение: {data}")
@@ -141,6 +174,16 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     await websocket.send_text(json.dumps({"error": f"Dice error: {str(e)}"}))
                     return
                 commit = hashlib.sha256((salt + str(dice_roll.result)).encode()).hexdigest()
+                # Сохраняем бросок в MongoDB
+                roll_doc = {
+                    "session_id": session_id,
+                    "user": user,
+                    "formula": formula,
+                    "result": dice_roll.result,
+                    "details": dice_roll.details,
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+                await roll_logs_col.insert_one(roll_doc)
                 # Сначала отправляем hash всем
                 await session.broadcast(json.dumps({"action": "dice.commit", "payload": {"user": user, "commit": commit}}))
                 # Затем результат и salt
@@ -211,6 +254,9 @@ def create_room():
     session_id = str(uuid.uuid4())[:8]
     session_manager.get_or_create(session_id)
     logger.info(f"Создана новая комната: {session_id}")
+    # Сохраняем комнату в MongoDB
+    loop = asyncio.get_event_loop()
+    loop.create_task(rooms_col.insert_one({"_id": session_id, "created_at": time.time()}))
     return JSONResponse(content={"slug": session_id})
 
 @app.post("/assets")
@@ -227,4 +273,14 @@ async def upload_asset(file: UploadFile = File(...)):
         f.write(contents)
     url = f"/assets/{filename}"
     logger.info(f"Загружен файл: {filename}")
+    # --- Сохраняем метаданные в MongoDB ---
+    asset_doc = {
+        "_id": filename.split(".")[0],
+        "filename": filename,
+        "url": url,
+        "content_type": file.content_type,
+        "size": len(contents),
+        "uploaded_at": asyncio.get_event_loop().time()
+    }
+    await assets_col.insert_one(asset_doc)
     return {"url": url} 
