@@ -6,6 +6,7 @@ import uuid
 import pytest_asyncio
 import websockets
 import asyncio
+import httpx
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from server.src.main import app
@@ -156,4 +157,62 @@ async def test_async_action_log():
             msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
             if msg["action"] == "log_state":
                 break
-        assert any(e.get("type") == "dice" and e.get("user") == client_id for e in msg["payload"]) 
+        assert any(e.get("type") == "dice" and e.get("user") == client_id for e in msg["payload"])
+
+def test_create_room():
+    with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+        response = client.post("/rooms")
+        assert response.status_code == 200
+        data = response.json()
+        assert "slug" in data
+        assert len(data["slug"]) >= 6
+
+def test_upload_asset(tmp_path):
+    # Создаём временный PNG-файл
+    png_path = tmp_path / "test.png"
+    with open(png_path, "wb") as f:
+        f.write(b"\x89PNG\r\n\x1a\n" + b"0" * 100)  # минимальный PNG
+    with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+        with open(png_path, "rb") as f:
+            files = {"file": ("test.png", f, "image/png")}
+            response = client.post("/assets", files=files)
+            assert response.status_code == 200
+            data = response.json()
+            assert "url" in data
+            assert data["url"].startswith("/assets/")
+
+def test_dice_service_uniform():
+    from server.src.session import GameSession
+    session = GameSession("test")
+    results = [session.roll_dice("u", "1d20").result for _ in range(1000)]
+    # Проверяем, что все значения от 1 до 20 встречаются
+    for i in range(1, 21):
+        assert i in results
+    # Проверяем edge: 100d1=100
+    res = session.roll_dice("u", "100d1").result
+    assert res == 100
+
+def test_dice_result_consistency():
+    import uuid, asyncio, websockets, json
+    session_id = str(uuid.uuid4())
+    url = f"ws://127.0.0.1:8000/ws/game/{session_id}"
+    async def run():
+        async with websockets.connect(url) as ws1, websockets.connect(url) as ws2:
+            await ws1.send(json.dumps({"client_id": "A"}))
+            await ws2.send(json.dumps({"client_id": "B"}))
+            await ws1.send(json.dumps({"action": "roll_dice", "payload": {"user": "A", "formula": "2d6+1"}}))
+            result1 = None
+            result2 = None
+            for _ in range(20):
+                if result1 is None:
+                    msg1 = json.loads(await asyncio.wait_for(ws1.recv(), timeout=5))
+                    if msg1.get("action") == "dice.result":
+                        result1 = msg1["payload"]["result"]
+                if result2 is None:
+                    msg2 = json.loads(await asyncio.wait_for(ws2.recv(), timeout=5))
+                    if msg2.get("action") == "dice.result":
+                        result2 = msg2["payload"]["result"]
+                if result1 is not None and result2 is not None:
+                    break
+            assert result1 == result2
+    asyncio.get_event_loop().run_until_complete(run()) 

@@ -9,7 +9,8 @@ uvicorn server.src.main:app --reload
 ```
 
 ## Структура
-- `src/` — исходный код 
+
+- `src/` — исходный код
 - `tests/` — тесты (pytest)
 
 ## Установка зависимостей
@@ -35,11 +36,13 @@ pip install -r requirements.txt
 ## WebSocket API (ws://.../ws/game/{session_id})
 
 **Первое сообщение:**
+
 ```json
 { "client_id": "..." }
 ```
 
 **Дальнейшие экшены:**
+
 - `get_players` — получить список игроков
 - `update_player_info` — обновить свою панель персонажа (имя, описание, цвет)
   - payload: `{ "name": "...", "description": "...", "color": "#..." }`
@@ -48,6 +51,7 @@ pip install -r requirements.txt
 - ... (остальные экшены: карта, токены, кубики, инициатива)
 
 **Ответы:**
+
 - `{ "action": "players_state", "payload": [ ... ] }` — обновлённый список игроков
 - `{ "error": "kicked" }` — если игрок кикнут
 - `{ "error": "Only GM can kick" }` — если не-ГМ пытается кикнуть
@@ -70,4 +74,4 @@ pytest server/tests --maxfail=3 --disable-warnings -v
 
 ## Описание
 
-Добавлена поддержка JWT-аутентификации (FastAPI, passlib, python-jose). 
+Добавлена поддержка JWT-аутентификации (FastAPI, passlib, python-jose).

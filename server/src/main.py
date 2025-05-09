@@ -1,9 +1,14 @@
 import os
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, UploadFile, File
+from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
 import logging
 from server.src.session import GameSessionManager
 import json
+import uuid
+import hashlib
+import random
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
@@ -13,6 +18,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dnd-lite")
 
 session_manager = GameSessionManager()
+
+ASSETS_DIR = os.path.join(os.path.dirname(__file__), '../../assets')
+os.makedirs(ASSETS_DIR, exist_ok=True)
+
+app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
+
+# --- Глобальный чат лог (500 строк) ---
+chat_log = []
 
 @app.get("/")
 def read_root():
@@ -108,18 +121,31 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
                 else:
                     await websocket.send_text(json.dumps({"error": "Invalid token id"}))
+            elif action == "chat.msg":
+                msg_obj = {"user": payload.get("user", "Гость"), "text": payload.get("text", "")}
+                chat_log.append(msg_obj)
+                if len(chat_log) > 500:
+                    chat_log.pop(0)
+                await session.broadcast(json.dumps({"action": "chat.msg", "payload": msg_obj}))
             elif action == "roll_dice":
                 user = payload.get("user", "player")
                 formula = payload.get("formula")
-                if formula:
-                    try:
-                        dice_roll = session.roll_dice(user, formula)
-                        await session.broadcast(json.dumps({"action": "dice_result", "payload": dice_roll.dict()}))
-                        await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
-                    except Exception as e:
-                        await websocket.send_text(json.dumps({"error": f"Dice error: {str(e)}"}))
-                else:
+                if not formula:
                     await websocket.send_text(json.dumps({"error": "No dice formula"}))
+                    return
+                # Генерируем salt и бросаем кубики
+                salt = str(random.randint(1, 1_000_000))
+                try:
+                    dice_roll = session.roll_dice(user, formula)
+                except Exception as e:
+                    await websocket.send_text(json.dumps({"error": f"Dice error: {str(e)}"}))
+                    return
+                commit = hashlib.sha256((salt + str(dice_roll.result)).encode()).hexdigest()
+                # Сначала отправляем hash всем
+                await session.broadcast(json.dumps({"action": "dice.commit", "payload": {"user": user, "commit": commit}}))
+                # Затем результат и salt
+                display = f"{user} бросил {formula}: {dice_roll.result} ({dice_roll.details})"
+                await session.broadcast(json.dumps({"action": "dice.result", "payload": {"user": user, "formula": formula, "result": dice_roll.result, "details": dice_roll.details, "salt": salt, "commit": commit, "display": display}}))
             elif action == "get_dice_history":
                 await websocket.send_text(json.dumps({"action": "dice_history", "payload": session.get_dice_history()}))
             elif action == "get_log":
@@ -162,10 +188,43 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     await session.broadcast(json.dumps({"action": "map_state", "payload": session.get_map()}))
                 else:
                     await websocket.send_text(json.dumps({"error": "Only GM can edit shading"}))
+            elif action == "map.setCurrent":
+                url = payload.get("url")
+                if url:
+                    session.state["map_url"] = url
+                    await session.broadcast(json.dumps({"action": "map.setCurrent", "payload": {"url": url}}))
+            elif action == "fog.update":
+                lines = payload.get("lines")
+                if isinstance(lines, list):
+                    session.state["fog_lines"] = lines
+                    await session.broadcast(json.dumps({"action": "fog.update", "payload": {"lines": lines}}))
             else:
                 await websocket.send_text(json.dumps({"error": "Unknown action"}))
     except WebSocketDisconnect:
         session.disconnect(websocket)
         await session.broadcast(json.dumps({"action": "info", "payload": f"[{session_id}] Игрок отключился"}))
         if not session.connections:
-            session_manager.remove(session_id) 
+            session_manager.remove(session_id)
+
+@app.post("/rooms")
+def create_room():
+    session_id = str(uuid.uuid4())[:8]
+    session_manager.get_or_create(session_id)
+    logger.info(f"Создана новая комната: {session_id}")
+    return JSONResponse(content={"slug": session_id})
+
+@app.post("/assets")
+async def upload_asset(file: UploadFile = File(...)):
+    if file.content_type not in ["image/png", "image/jpeg"]:
+        raise HTTPException(status_code=400, detail="Только PNG и JPG поддерживаются")
+    contents = await file.read()
+    if len(contents) > 20 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Файл слишком большой (макс. 20 МБ)")
+    ext = ".png" if file.content_type == "image/png" else ".jpg"
+    filename = str(uuid.uuid4()) + ext
+    path = os.path.join(ASSETS_DIR, filename)
+    with open(path, "wb") as f:
+        f.write(contents)
+    url = f"/assets/{filename}"
+    logger.info(f"Загружен файл: {filename}")
+    return {"url": url} 
