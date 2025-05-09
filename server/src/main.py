@@ -9,9 +9,13 @@ import json
 import uuid
 import hashlib
 import random
-import motor.motor_asyncio
 import asyncio
 import time
+from server.src.db import (
+    AsyncSessionLocal, init_db, Room, Asset, RoomState, RollLog
+)
+from sqlalchemy import select, delete
+from sqlalchemy.exc import NoResultFound
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
@@ -30,25 +34,33 @@ app.mount("/assets", StaticFiles(directory=ASSETS_DIR), name="assets")
 # --- Глобальный чат лог (500 строк) ---
 chat_log = []
 
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb://localhost:27017")
-mongo_client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI)
-db = mongo_client["dndlite"]
-rooms_col = db["rooms"]
-assets_col = db["assets"]
-room_states_col = db["room_states"]
-roll_logs_col = db["roll_logs"]
-
-# TTL-индекс на room_states (24ч)
-async def ensure_ttl():
-    await room_states_col.create_index("createdAt", expireAfterSeconds=86400)
-asyncio.get_event_loop().create_task(ensure_ttl())
+# --- Инициализация базы и TTL ---
+@app.on_event("startup")
+async def on_startup():
+    await init_db()
+    # Удаляем старые room_states (старше 24ч)
+    async with AsyncSessionLocal() as db:
+        cutoff = time.time() - 86400
+        await db.execute(delete(RoomState).where(RoomState.created_at < cutoff))
+        await db.commit()
 
 # --- Хелперы для сохранения/загрузки состояния ---
 async def save_room_state(session_id, state):
-    await room_states_col.replace_one({"_id": session_id}, {"_id": session_id, "createdAt": asyncio.get_event_loop().time(), "state": state}, upsert=True)
+    async with AsyncSessionLocal() as db:
+        obj = await db.get(RoomState, session_id)
+        now = time.time()
+        if obj:
+            obj.state = state
+            obj.created_at = now
+        else:
+            obj = RoomState(id=session_id, created_at=now, state=state)
+            db.add(obj)
+        await db.commit()
+
 async def load_room_state(session_id):
-    doc = await room_states_col.find_one({"_id": session_id})
-    return doc["state"] if doc else None
+    async with AsyncSessionLocal() as db:
+        obj = await db.get(RoomState, session_id)
+        return obj.state if obj else None
 
 @app.get("/")
 def read_root():
@@ -58,11 +70,10 @@ def read_root():
 @app.websocket("/ws/game/{session_id}")
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     await websocket.accept()
-    # При подключении пытаемся загрузить состояние из Mongo
+    # При подключении пытаемся загрузить состояние из БД
     loaded = await load_room_state(session_id)
     if loaded:
         session = session_manager.get_or_create(session_id)
-        # Восстанавливаем map, tokens, log, dice_history, fog и т.д.
         session.map = MapState(**loaded.get("map", {}))
         session.tokens = {t["id"]: Token(**t) for t in loaded.get("tokens", [])}
         session.action_log = loaded.get("action_log", [])
@@ -107,7 +118,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 session.update_player_info(client_id, payload)
                 await session.broadcast(json.dumps({"action": "players_state", "payload": session.get_players()}))
             elif action == "kick_player":
-                # Только ГМ может кикать
                 if session.gm_id == client_id:
                     to_kick = payload.get("client_id")
                     if to_kick and to_kick != client_id:
@@ -166,7 +176,6 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 if not formula:
                     await websocket.send_text(json.dumps({"error": "No dice formula"}))
                     return
-                # Генерируем salt и бросаем кубики
                 salt = str(random.randint(1, 1_000_000))
                 try:
                     dice_roll = session.roll_dice(user, formula)
@@ -174,19 +183,12 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     await websocket.send_text(json.dumps({"error": f"Dice error: {str(e)}"}))
                     return
                 commit = hashlib.sha256((salt + str(dice_roll.result)).encode()).hexdigest()
-                # Сохраняем бросок в MongoDB
-                roll_doc = {
-                    "session_id": session_id,
-                    "user": user,
-                    "formula": formula,
-                    "result": dice_roll.result,
-                    "details": dice_roll.details,
-                    "timestamp": asyncio.get_event_loop().time()
-                }
-                await roll_logs_col.insert_one(roll_doc)
-                # Сначала отправляем hash всем
+                # Сохраняем бросок в БД
+                async with AsyncSessionLocal() as db:
+                    roll = RollLog(session_id=session_id, user=user, formula=formula, result=dice_roll.result, details=dice_roll.details, timestamp=time.time())
+                    db.add(roll)
+                    await db.commit()
                 await session.broadcast(json.dumps({"action": "dice.commit", "payload": {"user": user, "commit": commit}}))
-                # Затем результат и salt
                 display = f"{user} бросил {formula}: {dice_roll.result} ({dice_roll.details})"
                 await session.broadcast(json.dumps({"action": "dice.result", "payload": {"user": user, "formula": formula, "result": dice_roll.result, "details": dice_roll.details, "salt": salt, "commit": commit, "display": display}}))
             elif action == "get_dice_history":
@@ -250,13 +252,13 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
             session_manager.remove(session_id)
 
 @app.post("/rooms")
-def create_room():
+async def create_room():
     session_id = str(uuid.uuid4())[:8]
     session_manager.get_or_create(session_id)
     logger.info(f"Создана новая комната: {session_id}")
-    # Сохраняем комнату в MongoDB
-    loop = asyncio.get_event_loop()
-    loop.create_task(rooms_col.insert_one({"_id": session_id, "created_at": time.time()}))
+    async with AsyncSessionLocal() as db:
+        db.add(Room(id=session_id, created_at=time.time()))
+        await db.commit()
     return JSONResponse(content={"slug": session_id})
 
 @app.post("/assets")
@@ -273,14 +275,8 @@ async def upload_asset(file: UploadFile = File(...)):
         f.write(contents)
     url = f"/assets/{filename}"
     logger.info(f"Загружен файл: {filename}")
-    # --- Сохраняем метаданные в MongoDB ---
-    asset_doc = {
-        "_id": filename.split(".")[0],
-        "filename": filename,
-        "url": url,
-        "content_type": file.content_type,
-        "size": len(contents),
-        "uploaded_at": asyncio.get_event_loop().time()
-    }
-    await assets_col.insert_one(asset_doc)
+    # --- Сохраняем метаданные в БД ---
+    async with AsyncSessionLocal() as db:
+        db.add(Asset(id=filename.split(".")[0], filename=filename, url=url, content_type=file.content_type, size=len(contents), uploaded_at=time.time()))
+        await db.commit()
     return {"url": url} 

@@ -907,10 +907,16 @@ function Chat({ ws, clientId }: { ws: WebSocket | null; clientId: string }) {
   );
 }
 
+function getRoomIdFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("room") || "";
+}
+
 function App() {
-  const [sessionId, setSessionId] = useState("");
+  const [sessionId, setSessionId] = useState(getRoomIdFromUrl());
   const [connected, setConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
+  const [pendingConnect, setPendingConnect] = useState(false);
   const [map, setMap] = useState<any>({
     width: 20,
     height: 20,
@@ -922,41 +928,49 @@ function App() {
   const [log, setLog] = useState<any[]>([]);
   const clientId = getOrCreateClientId();
   const [mapUrl, setMapUrl] = useState<string | null>(null);
+  const [autoConnect, setAutoConnect] = useState(false);
 
   const tokens = useTokenStore(state => state.tokens);
   const setTokens = useTokenStore(state => state.setTokens);
 
-  useEffect(() => {
-    if (!ws) return;
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      if (msg.action === "map_state") setMap(msg.payload);
-      else if (msg.action === "tokens_state") setTokens(msg.payload);
-      else if (msg.action === "players_state") {
-        setPlayers(msg.payload);
-        const me = msg.payload.find((p: any) => p.client_id === clientId);
-        setIsGM(!!me?.is_gm);
-      } else if (msg.action === "log_state") setLog(msg.payload);
-      else if (msg.action === "map.setCurrent" && msg.payload?.url) {
-        setMapUrl(msg.payload.url);
-      }
-    };
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ action: "get_log" }));
-    };
-  }, [ws, clientId]);
-
-  const handleConnect = () => {
-    if (!sessionId) return;
-    const socket = new WebSocket(WS_URL + sessionId);
+  const handleConnect = (id = sessionId) => {
+    if (!id) return;
+    setPendingConnect(true);
+    const socket = new WebSocket(WS_URL + id);
     setWs(socket);
     socket.onopen = () => {
       socket.send(JSON.stringify({ client_id: clientId }));
-      // Лог запрашивается в useEffect выше
       setConnected(true);
+      setPendingConnect(false);
     };
-    socket.onclose = () => setConnected(false);
+    socket.onclose = (event) => {
+      setConnected(false);
+      setWs(null);
+      setPendingConnect(false);
+    };
+    socket.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.action === "map_state") setMap(msg.payload);
+        else if (msg.action === "tokens_state") setTokens(msg.payload);
+        else if (msg.action === "players_state") {
+          setPlayers(msg.payload);
+          const me = msg.payload.find((p: any) => p.client_id === clientId);
+          setIsGM(!!me?.is_gm);
+        } else if (msg.action === "log_state") setLog(msg.payload);
+        else if (msg.action === "map.setCurrent" && msg.payload?.url) {
+          setMapUrl(msg.payload.url);
+        }
+      } catch {}
+    };
   };
+
+  // После успешного подключения — запрашиваем лог
+  useEffect(() => {
+    if (ws && connected) {
+      ws.send(JSON.stringify({ action: "get_log" }));
+    }
+  }, [ws, connected]);
 
   // При загрузке карты ГМ отправляет map.setCurrent всем
   const handleMapUrlChange = (url: string) => {
@@ -965,6 +979,44 @@ function App() {
       ws.send(JSON.stringify({ action: "map.setCurrent", payload: { url } }));
     }
   };
+
+  // Копировать id комнаты
+  const handleCopyId = () => {
+    navigator.clipboard.writeText(sessionId);
+  };
+  // Копировать ссылку на комнату
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(`${window.location.origin}?room=${sessionId}`);
+  };
+  // Выйти из комнаты
+  const handleLeave = () => {
+    if (ws) ws.close();
+    setConnected(false);
+    setSessionId("");
+    setWs(null);
+    window.history.replaceState({}, document.title, window.location.pathname);
+  };
+
+  // Если пользователь зашёл по ссылке с room=..., автозаполняем поле
+  useEffect(() => {
+    const urlRoom = getRoomIdFromUrl();
+    if (urlRoom && !connected) setSessionId(urlRoom);
+  }, []);
+
+  // После подключения обновляем url
+  useEffect(() => {
+    if (connected && sessionId) {
+      window.history.replaceState({}, "", `?room=${sessionId}`);
+    }
+  }, [connected, sessionId]);
+
+  // useEffect для автоподключения после создания комнаты
+  useEffect(() => {
+    if (autoConnect && sessionId) {
+      handleConnect(sessionId);
+      setAutoConnect(false);
+    }
+  }, [autoConnect, sessionId]);
 
   return (
     <div style={{ minHeight: "100vh", background: fantasyBg, padding: 0 }}>
@@ -978,6 +1030,15 @@ function App() {
           gap: 24,
         }}
       >
+        {!connected && (
+          <div style={{ marginBottom: 24, color: accent, fontSize: 18 }}>
+            <b>Введите ID комнаты или создайте новую.</b><br />
+            <span style={{ color: "#555", fontSize: 15 }}>
+              После создания комнаты вы сможете скопировать ссылку и отправить друзьям.<br />
+              Для входа по приглашению используйте ссылку вида <code>?room=ID</code>.
+            </span>
+          </div>
+        )}
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <input
             type="text"
@@ -991,12 +1052,12 @@ function App() {
               border: "2px solid #b08968",
               width: 220,
             }}
-            disabled={connected}
+            disabled={connected || pendingConnect}
             data-cy="session-id-input"
           />
           <button
-            onClick={handleConnect}
-            disabled={connected || !sessionId}
+            onClick={() => handleConnect()}
+            disabled={connected || !sessionId || pendingConnect}
             style={{
               background: accent,
               color: "#fff",
@@ -1009,19 +1070,25 @@ function App() {
             }}
             data-cy="connect-btn"
           >
-            {connected ? "Подключено" : "Подключиться"}
+            {pendingConnect ? "Подключение..." : connected ? "Подключено" : "Подключиться"}
           </button>
           <button
             onClick={async () => {
-              // Создать новую комнату через backend
+              if (connected && ws) {
+                const wsToClose = ws;
+                setConnected(false);
+                setWs(null);
+                await new Promise(resolve => {
+                  wsToClose.onclose = resolve;
+                  wsToClose.close();
+                });
+              }
               const resp = await fetch("http://127.0.0.1:8000/rooms", { method: "POST" });
               const data = await resp.json();
               if (data.slug) {
-                setSessionId(data.slug);
-                setTimeout(() => handleConnect(), 100); // Подключиться автоматически
+                window.location.href = `/?room=${data.slug}`;
               }
             }}
-            disabled={connected}
             style={{
               background: accentHover,
               color: "#fff",
@@ -1036,14 +1103,29 @@ function App() {
           >
             Создать комнату
           </button>
-          {connected && (
-            <span
-              style={{ color: "#228b22", fontWeight: "bold", fontSize: 18 }}
-            >
+        </div>
+        {connected && (
+          <div style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 18,
+            margin: "12px 0 0 0",
+            background: "#f8f5ed",
+            border: "2px solid #b08968",
+            borderRadius: 12,
+            padding: "12px 24px"
+          }}>
+            <span style={{ fontSize: 18, color: accent }}>
+              <b>ID комнаты:</b> <span style={{ fontFamily: "monospace", fontSize: 20 }}>{sessionId}</span>
+            </span>
+            <button onClick={handleCopyId} style={{ background: accent, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>Скопировать ID</button>
+            <button onClick={handleCopyLink} style={{ background: accent, color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: "bold", fontSize: 16, cursor: "pointer" }}>Скопировать ссылку</button>
+            <button onClick={handleLeave} style={{ background: "#b22222", color: "#fff", border: "none", borderRadius: 8, padding: "6px 16px", fontWeight: "bold", fontSize: 16, cursor: "pointer", marginLeft: 18 }}>Выйти</button>
+            <span style={{ color: "#228b22", fontWeight: "bold", fontSize: 18, marginLeft: 18 }}>
               Вы {isGM ? "ГМ" : "игрок"}
             </span>
-          )}
-        </div>
+          </div>
+        )}
         {connected && (
           <div style={{ display: "flex", alignItems: "flex-start", gap: 32 }}>
             <div>
