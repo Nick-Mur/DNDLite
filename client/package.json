@@ -1,0 +1,17 @@
+{
+  "name": "dnd-lite-client",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "vite"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "dnd-lite-monorepo": "file:..",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  }
+}
