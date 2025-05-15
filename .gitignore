@@ -37,4 +37,11 @@ yarn-error.log*
 
 # Local env files
 .env.*
-.env 
+.env
+
+# New additions
+*.db
+cypress/screenshots/
+videos/
+trace/
+test-results/ 
