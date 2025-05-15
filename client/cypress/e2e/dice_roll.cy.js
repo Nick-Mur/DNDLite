@@ -4,9 +4,9 @@
 describe('Бросок кубиков', () => {
   it('Пользователь может бросить кубики через чат', () => {
     cy.visit('http://localhost:5173');
-    // Ввести команду /roll 2d6+1 в чат (замените селектор на актуальный для вашего UI)
-    cy.get('[data-cy=chat-input]').type('/roll 2d6+1{enter}');
-    // Проверить, что результат броска появился в чате
+    cy.get('[data-cy=session-id-input]').clear().type('test-dice-roll');
+    cy.get('[data-cy=connect-btn]').click();
+    cy.get('[data-cy=chat-input]').should('be.visible').type('/roll 2d6+1{enter}');
     cy.get('[data-cy=chat-log]').contains('бросил 2d6+1');
   });
 }); 

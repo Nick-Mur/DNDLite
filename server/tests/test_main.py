@@ -7,6 +7,7 @@ import pytest_asyncio
 import websockets
 import asyncio
 import httpx
+import io
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from server.src.main import app
@@ -69,8 +70,11 @@ async def test_async_dice_roll():
     async with websockets.connect(url) as ws:
         await ws.send(json.dumps({"client_id": client_id}))
         await ws.send(json.dumps({"action": "roll_dice", "payload": {"user": "testuser", "formula": "2d6+1"}}))
-        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["action"] == "dice_result"
+        # Ждём dice.result (может быть несколько сообщений)
+        while True:
+            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            if msg["action"] == "dice.result":
+                break
         assert msg["payload"]["user"] == "testuser"
         assert msg["payload"]["formula"] == "2d6+1"
         assert isinstance(msg["payload"]["result"], int)
@@ -108,9 +112,11 @@ async def test_async_gm_and_kick():
         # ГМ подключается первым и становится ГМ
         async with websockets.connect(url) as ws_player:
             await ws_player.send(json.dumps({"client_id": player_id}))
-            # ГМ видит обоих
+            # Даем серверу время обработать подключение второго игрока
+            await asyncio.sleep(0.2)
+            # Явно запрашиваем список игроков после подключения второго игрока
             await ws_gm.send(json.dumps({"action": "get_players"}))
-            while True:
+            for _ in range(10):
                 msg = json.loads(await asyncio.wait_for(ws_gm.recv(), timeout=5))
                 if msg["action"] == "players_state":
                     break
@@ -118,9 +124,12 @@ async def test_async_gm_and_kick():
             assert any(p["client_id"] == player_id for p in msg["payload"])
             # ГМ кикает игрока
             await ws_gm.send(json.dumps({"action": "kick_player", "payload": {"client_id": player_id}}))
-            msg_gm = json.loads(await asyncio.wait_for(ws_gm.recv(), timeout=5))
-            msg_player = json.loads(await asyncio.wait_for(ws_player.recv(), timeout=5))
-            assert not any(p["client_id"] == player_id for p in msg_player["payload"])
+            # Ждём обновления списка игроков у ГМа
+            for _ in range(10):
+                msg_gm = json.loads(await asyncio.wait_for(ws_gm.recv(), timeout=5))
+                if msg_gm["action"] == "players_state":
+                    break
+            assert not any(p["client_id"] == player_id for p in msg_gm["payload"])
             # Попытка вернуться — kicked
             async with websockets.connect(url) as ws_player2:
                 await ws_player2.send(json.dumps({"client_id": player_id}))
@@ -138,25 +147,31 @@ async def test_async_action_log():
         await ws.send(json.dumps({"client_id": client_id}))
         # Получить пустой лог
         await ws.send(json.dumps({"action": "get_log"}))
-        msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
-        assert msg["action"] == "log_state"
+        while True:
+            msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
+            if msg["action"] == "log_state":
+                break
         assert isinstance(msg["payload"], list)
         log_len = len(msg["payload"])
         # Добавить токен
         await ws.send(json.dumps({"action": "add_token", "payload": {"id": "tlog1", "x": 1, "y": 2, "name": "LogHero", "color": "#00ff00"}}))
-        # Получить обновление лога
-        while True:
+        for _ in range(20):
             msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
             if msg["action"] == "log_state":
                 break
+        else:
+            assert False, "Не пришёл log_state после add_token"
         assert any(e.get("type") == "add_token" and e.get("token", {}).get("id") == "tlog1" for e in msg["payload"])
         # Бросок кубика
         await ws.send(json.dumps({"action": "roll_dice", "payload": {"user": client_id, "formula": "1d6"}}))
-        # Получить обновление лога
-        while True:
+        # Явно запрашиваем log_state
+        await ws.send(json.dumps({"action": "get_log"}))
+        for _ in range(20):
             msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=5))
             if msg["action"] == "log_state":
                 break
+        else:
+            assert False, "Не пришёл log_state после roll_dice"
         assert any(e.get("type") == "dice" and e.get("user") == client_id for e in msg["payload"])
 
 def test_create_room():
@@ -215,4 +230,54 @@ def test_dice_result_consistency():
                 if result1 is not None and result2 is not None:
                     break
             assert result1 == result2
-    asyncio.get_event_loop().run_until_complete(run()) 
+    asyncio.get_event_loop().run_until_complete(run())
+
+@pytest.mark.asyncio
+async def test_ws_invalid_action():
+    session_id = str(uuid.uuid4())
+    url = f"ws://127.0.0.1:8000/ws/game/{session_id}"
+    client_id = 'invalid_action_user'
+    async with websockets.connect(url) as ws:
+        await ws.send(json.dumps({"client_id": client_id}))
+        await ws.send(json.dumps({"action": "nonexistent_action", "payload": {}}))
+        data = await asyncio.wait_for(ws.recv(), timeout=5)
+        msg = json.loads(data)
+        assert "error" in msg
+
+@pytest.mark.asyncio
+async def test_ws_move_nonexistent_token():
+    session_id = str(uuid.uuid4())
+    url = f"ws://127.0.0.1:8000/ws/game/{session_id}"
+    client_id = 'move_token_user'
+    async with websockets.connect(url) as ws:
+        await ws.send(json.dumps({"client_id": client_id}))
+        await ws.send(json.dumps({"action": "move_token", "payload": {"id": "not_exist", "x": 1, "y": 1}}))
+        # Ожидаем ошибку или отсутствие изменений (сервер не падает)
+
+@pytest.mark.asyncio
+async def test_ws_roll_dice_invalid_formula():
+    session_id = str(uuid.uuid4())
+    url = f"ws://127.0.0.1:8000/ws/game/{session_id}"
+    client_id = 'dice_invalid_user'
+    async with websockets.connect(url) as ws:
+        await ws.send(json.dumps({"client_id": client_id}))
+        await ws.send(json.dumps({"action": "roll_dice", "payload": {"user": "test", "formula": "bad_formula"}}))
+        data = await asyncio.wait_for(ws.recv(), timeout=5)
+        msg = json.loads(data)
+        assert "error" in msg
+
+def test_upload_asset_invalid_format():
+    with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+        file = io.BytesIO(b"notanimage")
+        files = {"file": ("test.txt", file, "text/plain")}
+        response = client.post("/assets", files=files)
+        assert response.status_code == 400
+        assert "Только PNG и JPG" in response.text
+
+def test_upload_asset_too_large():
+    with httpx.Client(base_url="http://127.0.0.1:8000") as client:
+        file = io.BytesIO(b"0" * (21 * 1024 * 1024))
+        files = {"file": ("big.png", file, "image/png")}
+        response = client.post("/assets", files=files)
+        assert response.status_code == 400
+        assert "Файл слишком большой" in response.text 

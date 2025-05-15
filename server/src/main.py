@@ -16,10 +16,19 @@ from server.src.db import (
 )
 from sqlalchemy import select, delete
 from sqlalchemy.exc import NoResultFound
+from fastapi.middleware.cors import CORSMiddleware
 
 load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '../.env'))
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("dnd-lite")
@@ -124,6 +133,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                         session.kick_player(to_kick)
                         await session.broadcast(json.dumps({"action": "players_state", "payload": session.get_players()}))
                         await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                        logger.info(f"[DEBUG] log_state payload: {session.get_log()}")
                 else:
                     await websocket.send_text(json.dumps({"error": "Only GM can kick"}))
             elif action == "get_map":
@@ -132,12 +142,14 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 session.add_wall(payload)
                 await session.broadcast(json.dumps({"action": "map_state", "payload": session.get_map()}))
                 await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                logger.info(f"[LOG] После add_wall: {session.get_log()}")
             elif action == "remove_wall":
                 idx = payload.get("index")
                 if isinstance(idx, int):
                     session.remove_wall(idx)
                     await session.broadcast(json.dumps({"action": "map_state", "payload": session.get_map()}))
                     await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                    logger.info(f"[LOG] После remove_wall: {session.get_log()}")
                 else:
                     await websocket.send_text(json.dumps({"error": "Invalid wall index"}))
             elif action == "get_tokens":
@@ -146,6 +158,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 session.add_token(payload)
                 await session.broadcast(json.dumps({"action": "tokens_state", "payload": session.get_tokens()}))
                 await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                logger.info(f"[LOG] После add_token: {session.get_log()}")
             elif action == "move_token":
                 tid = payload.get("id")
                 x = payload.get("x")
@@ -154,6 +167,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     session.move_token(tid, x, y)
                     await session.broadcast(json.dumps({"action": "tokens_state", "payload": session.get_tokens()}))
                     await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                    logger.info(f"[LOG] После move_token: {session.get_log()}")
                 else:
                     await websocket.send_text(json.dumps({"error": "Invalid token move data"}))
             elif action == "remove_token":
@@ -162,6 +176,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                     session.remove_token(tid)
                     await session.broadcast(json.dumps({"action": "tokens_state", "payload": session.get_tokens()}))
                     await session.broadcast(json.dumps({"action": "log_state", "payload": session.get_log()}))
+                    logger.info(f"[LOG] После remove_token: {session.get_log()}")
                 else:
                     await websocket.send_text(json.dumps({"error": "Invalid token id"}))
             elif action == "chat.msg":
@@ -170,6 +185,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 if len(chat_log) > 500:
                     chat_log.pop(0)
                 await session.broadcast(json.dumps({"action": "chat.msg", "payload": msg_obj}))
+                logger.info(f"[LOG] После chat.msg: {session.get_log()}")
             elif action == "roll_dice":
                 user = payload.get("user", "player")
                 formula = payload.get("formula")
@@ -191,6 +207,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
                 await session.broadcast(json.dumps({"action": "dice.commit", "payload": {"user": user, "commit": commit}}))
                 display = f"{user} бросил {formula}: {dice_roll.result} ({dice_roll.details})"
                 await session.broadcast(json.dumps({"action": "dice.result", "payload": {"user": user, "formula": formula, "result": dice_roll.result, "details": dice_roll.details, "salt": salt, "commit": commit, "display": display}}))
+                logger.info(f"[LOG] После roll_dice: {session.get_log()}")
             elif action == "get_dice_history":
                 await websocket.send_text(json.dumps({"action": "dice_history", "payload": session.get_dice_history()}))
             elif action == "get_log":

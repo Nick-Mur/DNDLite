@@ -4,11 +4,12 @@
 describe('Загрузка карты', () => {
   it('Пользователь может загрузить изображение карты', () => {
     cy.visit('http://localhost:5173');
-    // Открыть диалог загрузки карты (замените селектор на актуальный для вашего UI)
-    cy.get('[data-cy=upload-map-btn]').click();
-    // Загрузить тестовый файл (test-map.png должен лежать в cypress/fixtures)
-    cy.get('input[type=file]').selectFile('cypress/fixtures/test-map.png', { force: true });
-    // Проверить, что изображение появилось на доске (замените селектор на актуальный)
+    cy.get('[data-cy=session-id-input]').clear().type('test-map-upload');
+    cy.get('[data-cy=connect-btn]').click();
+    cy.get('input[placeholder="Имя токена"]').type('Для загрузки');
+    cy.get('[data-cy=add-token-btn]').should('be.visible').click();
+    cy.get('[data-cy=upload-map-btn]').should('be.visible').click();
+    cy.get('input[type=file][data-cy=upload-map-input]').selectFile('cypress/fixtures/test-map.png', { force: true });
     cy.get('[data-cy=map-image]').should('be.visible');
   });
 }); 
