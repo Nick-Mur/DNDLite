@@ -18,6 +18,10 @@ const headingFont = "UnifrakturCook, serif";
 
 const WS_URL = "ws://127.0.0.1:8000/ws/game/";
 
+declare global {
+  interface Window { ws?: WebSocket }
+}
+
 function getOrCreateClientId() {
   let id = localStorage.getItem("client_id");
   if (!id) {
@@ -127,6 +131,7 @@ function MapEditor({
           strokeWidth={1}
           onClick={() => tool === "shading" && handleCellClick(x, y)}
           style={{ cursor: isGM && tool === "shading" ? "pointer" : "default" }}
+          data-cy={`map-cell-${x}-${y}`}
         />,
       );
     }
@@ -146,6 +151,7 @@ function MapEditor({
         isGM && tool === "wall" && handleEdgeClick(w.x1, w.y1, w.x2, w.y2)
       }
       style={{ cursor: isGM && tool === "wall" ? "pointer" : "default" }}
+      data-cy={`wall-${i}`}
     />
   ));
   // Токены (кружки с именем)
@@ -195,6 +201,7 @@ function MapEditor({
             fill="transparent"
             onClick={() => handleEdgeClick(x, y, x + 1, y)}
             style={{ cursor: "pointer" }}
+            data-cy={`map-edge-${x}-${y}-h`}
           />,
         );
       }
@@ -212,6 +219,7 @@ function MapEditor({
             fill="transparent"
             onClick={() => handleEdgeClick(x, y, x, y + 1)}
             style={{ cursor: "pointer" }}
+            data-cy={`map-edge-${x}-${y}-v`}
           />,
         );
       }
@@ -261,6 +269,7 @@ function MapEditor({
               fontSize: 16,
               cursor: "pointer",
             }}
+            data-cy="wall-tool-btn"
           >
             Стены
           </button>
@@ -276,6 +285,7 @@ function MapEditor({
               fontSize: 16,
               cursor: "pointer",
             }}
+            data-cy="shading-tool-btn"
           >
             Заштриховка
           </button>
@@ -308,6 +318,7 @@ function MapEditor({
                 cursor: "pointer",
                 marginLeft: 24,
               }}
+              data-cy="remove-token-btn"
             >
               Удалить токен
             </button>
@@ -340,6 +351,9 @@ function AddTokenForm({ ws }: { ws: WebSocket | null }) {
         payload: { id, name, color, x, y },
       }),
     );
+    setTimeout(() => {
+      ws.send(JSON.stringify({ action: "get_log" }));
+    }, 200);
     setName("");
     setColor("#000000");
     setX(0);
@@ -440,6 +454,7 @@ function ActionLog({ log }: { log: any[] }) {
         marginLeft: 24,
         padding: 12,
       }}
+      data-cy="action-log"
     >
       <div
         style={{
@@ -938,6 +953,7 @@ function App() {
     setPendingConnect(true);
     const socket = new WebSocket(WS_URL + id);
     setWs(socket);
+    window.ws = socket;
     socket.onopen = () => {
       socket.send(JSON.stringify({ client_id: clientId }));
       setConnected(true);
@@ -957,8 +973,11 @@ function App() {
           setPlayers(msg.payload);
           const me = msg.payload.find((p: any) => p.client_id === clientId);
           setIsGM(!!me?.is_gm);
-        } else if (msg.action === "log_state") setLog(msg.payload);
-        else if (msg.action === "map.setCurrent" && msg.payload?.url) {
+        } else if (msg.action === "log_state") {
+          console.log('[CLIENT] log_state payload:', msg.payload);
+          if (Array.isArray(msg.payload)) setLog(msg.payload);
+          else if (msg.payload) setLog((prev: any[]) => [...prev, msg.payload]);
+        } else if (msg.action === "map.setCurrent" && msg.payload?.url) {
           setMapUrl(msg.payload.url);
         }
       } catch {}
@@ -1136,6 +1155,30 @@ function App() {
               </div>
             </div>
             <ActionLog log={log} />
+            <div style={{ minWidth: 220, maxWidth: 320, ...parchment, padding: 12, marginLeft: 12 }}>
+              <div style={{ fontWeight: "bold", fontSize: 18, marginBottom: 8, fontFamily: headingFont, color: accent }}>
+                Игроки
+              </div>
+              {players.length === 0 && <div style={{ color: "#888" }}>Нет игроков</div>}
+              {players.map((p) => (
+                <div key={p.client_id} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ color: p.is_gm ? accent : "#333", fontWeight: p.is_gm ? "bold" : undefined }}>
+                    {p.name || p.client_id} {p.is_gm ? "(ГМ)" : ""}
+                  </span>
+                  {isGM && p.client_id !== clientId && (
+                    <button
+                      style={{ background: "#b22222", color: "#fff", border: "none", borderRadius: 6, padding: "2px 10px", fontSize: 14, cursor: "pointer", marginLeft: 8 }}
+                      data-cy={`kick-player-btn-${p.client_id}`}
+                      onClick={() => {
+                        if (ws) ws.send(JSON.stringify({ action: "kick_player", payload: { client_id: p.client_id } }));
+                      }}
+                    >
+                      Кик
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
             <Chat ws={ws} clientId={clientId} />
           </div>
         )}
