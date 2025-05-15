@@ -2,8 +2,16 @@
 // Тест: загрузка карты (PNG/JPG) через UI
 
 describe('Загрузка карты', () => {
-  it('Пользователь может загрузить изображение карты', () => {
+  beforeEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
     cy.visit('http://localhost:5173');
+  });
+  afterEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+  });
+  it('Пользователь может загрузить изображение карты', () => {
     cy.get('[data-cy=session-id-input]').clear().type('test-map-upload');
     cy.get('[data-cy=connect-btn]').click();
     cy.get('input[placeholder="Имя токена"]').type('Для загрузки');

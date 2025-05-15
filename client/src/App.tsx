@@ -745,7 +745,7 @@ function MapUploadAndView({ isGM, mapUrl, setMapUrl, ws, clientId }: { isGM: boo
   return (
     <div style={{ marginBottom: 16 }}>
       {isGM && (
-        <div style={{ marginBottom: 8, display: "flex", gap: 12, alignItems: "center" }}>
+        <div style={{ marginBottom: 8, display: "flex", gap: 16, alignItems: "center", flexDirection: window.innerWidth <= 600 ? 'column' : 'row', width: '100%' }}>
           <input
             type="file"
             accept="image/png,image/jpeg"
@@ -928,7 +928,9 @@ function getRoomIdFromUrl() {
 }
 
 function App() {
-  const [sessionId, setSessionId] = useState(getRoomIdFromUrl());
+  const [sessionId, setSessionId] = useState(() => {
+    return getRoomIdFromUrl() || localStorage.getItem('session_id') || "";
+  });
   const [connected, setConnected] = useState(false);
   const [ws, setWs] = useState<WebSocket | null>(null);
   const [pendingConnect, setPendingConnect] = useState(false);
@@ -960,13 +962,23 @@ function App() {
       setPendingConnect(false);
     };
     socket.onclose = (event) => {
+      console.log('[DEBUG] socket.onclose');
       setConnected(false);
       setWs(null);
       setPendingConnect(false);
+      setSessionId("");
     };
     socket.onmessage = (event) => {
       try {
         const msg = JSON.parse(event.data);
+        if (msg.error) {
+          setConnected(false);
+          setPendingConnect(false);
+          setWs(null);
+          setSessionId("");
+          alert(msg.error);
+          return;
+        }
         if (msg.action === "map_state") setMap(msg.payload);
         else if (msg.action === "tokens_state") setTokens(msg.payload);
         else if (msg.action === "players_state") {
@@ -1037,6 +1049,14 @@ function App() {
     }
   }, [autoConnect, sessionId]);
 
+  useEffect(() => {
+    if (sessionId) localStorage.setItem('session_id', sessionId);
+  }, [sessionId]);
+
+  useEffect(() => {
+    console.log('[DEBUG] connected:', connected, 'pendingConnect:', pendingConnect, 'sessionId:', sessionId);
+  }, [connected, pendingConnect, sessionId]);
+
   return (
     <div style={{ minHeight: "100vh", background: fantasyBg, padding: 0 }}>
       <div
@@ -1058,7 +1078,13 @@ function App() {
             </span>
           </div>
         )}
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ 
+          display: "flex",
+          alignItems: "center",
+          gap: 16,
+          flexDirection: window.innerWidth <= 600 ? 'column' : 'row',
+          width: '100%',
+        }}>
           <input
             type="text"
             placeholder="ID сессии"

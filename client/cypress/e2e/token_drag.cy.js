@@ -2,8 +2,16 @@
 // Тест: drag-n-drop токена по карте
 
 describe('Перетаскивание токена', () => {
-  it('Пользователь может перетащить токен по карте', () => {
+  beforeEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
     cy.visit('http://localhost:5173');
+  });
+  afterEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+  });
+  it('Пользователь может перетащить токен по карте', () => {
     cy.get('[data-cy=session-id-input]').clear().type('test-token-drag');
     cy.get('[data-cy=connect-btn]').click();
     cy.get('input[placeholder="Имя токена"]').type('ДрагТокен');

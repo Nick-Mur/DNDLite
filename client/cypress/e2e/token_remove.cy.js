@@ -1,8 +1,16 @@
 // Тест: удаление токена ГМ
 
 describe('Удаление токена', () => {
-  it('ГМ может удалить токен', () => {
+  beforeEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
     cy.visit('http://localhost:5173');
+  });
+  afterEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+  });
+  it('ГМ может удалить токен', () => {
     cy.get('[data-cy=session-id-input]').clear().type('test-token-remove');
     cy.get('[data-cy=connect-btn]').click();
     cy.get('input[placeholder="Имя токена"]').type('Удаляемый токен');

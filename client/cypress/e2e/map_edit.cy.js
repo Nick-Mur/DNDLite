@@ -1,8 +1,16 @@
 // Тест: редактирование карты (стены, shading)
 
 describe('Редактирование карты', () => {
-  it('ГМ может добавить и удалить стену, заштриховать клетку', () => {
+  beforeEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
     cy.visit('http://localhost:5173');
+  });
+  afterEach(() => {
+    cy.clearLocalStorage();
+    cy.clearCookies();
+  });
+  it('ГМ может добавить и удалить стену, заштриховать клетку', () => {
     cy.get('[data-cy=session-id-input]').clear().type('test-map-edit');
     cy.get('[data-cy=connect-btn]').click();
     cy.get('input[placeholder="Имя токена"]').type('Для карты');

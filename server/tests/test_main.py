@@ -8,11 +8,20 @@ import websockets
 import asyncio
 import httpx
 import io
+import socket
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from server.src.main import app
 
 # Оставлены только асинхронные тесты
+
+@pytest.fixture(scope="session")
+def unused_tcp_port():
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind(("127.0.0.1", 0))
+    port = s.getsockname()[1]
+    s.close()
+    return port
 
 @pytest.mark.asyncio
 async def test_async_ws_get_players():
