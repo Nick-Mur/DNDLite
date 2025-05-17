@@ -50,6 +50,14 @@ function initApp() {
   const saveTokenBtn = document.getElementById('save-token-btn');
   const tokenList = document.getElementById('token-list');
 
+  // ======= НАСТРОЙКИ: СОХРАНЕНИЕ/ЗАГРУЗКА/ВОЗВРАТ В МЕНЮ =======
+  const saveGameBtn = document.getElementById('save-game-btn');
+  const loadGameBtn = document.getElementById('load-game-btn');
+  const loadGameInput = document.getElementById('load-game-input');
+  const backToMenuBtn = document.getElementById('back-to-menu-btn');
+  const menuScreen = document.getElementById('menu-screen');
+  const mainApp = document.getElementById('main-app');
+
   // ======= ЛОГИКА СЕТКИ =======
   function applyTool(x, y) {
     const half = Math.floor(brushSize / 2);
@@ -171,6 +179,85 @@ function initApp() {
   // Включаем drag&drop для фишек
   window.selectedTool = selectedTool;
   enableTokenDragAndDrop(gameGrid, tokens, gridSize, redrawTokens, () => refreshTokenList(tokenList, openTokenModal, highlightTokenOnField));
+
+  // Сохранить игру
+  if (saveGameBtn) {
+    saveGameBtn.addEventListener('click', () => {
+      const state = {
+        gridSize,
+        cellColors: Array.from(cellColors.entries()),
+        tokens: JSON.parse(JSON.stringify(tokens)),
+        dice: diceSelect.value,
+        diceFaceValue: diceFace.textContent,
+        selectedColor: colorPicker.value
+      };
+      const blob = new Blob([JSON.stringify(state, null, 2)], {type: 'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dnd_game_state.json';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 0);
+    });
+  }
+
+  // Загрузить игру
+  if (loadGameBtn && loadGameInput) {
+    loadGameBtn.addEventListener('click', () => loadGameInput.click());
+    loadGameInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = evt => {
+        try {
+          const state = JSON.parse(evt.target.result);
+          if (typeof state.gridSize === 'number') {
+            gridSizeInput.value = state.gridSize;
+            gridSize = state.gridSize;
+          }
+          if (Array.isArray(state.cellColors)) {
+            cellColors.clear();
+            for (const [key, value] of state.cellColors) cellColors.set(key, value);
+          }
+          if (Array.isArray(state.tokens)) {
+            tokens.length = 0;
+            for (const t of state.tokens) tokens.push(t);
+          }
+          if (state.dice) diceSelect.value = state.dice;
+          buildGrid(gameGrid, gridSize, ()=>{
+            // Восстановление рисунков
+            if (Array.isArray(state.cellColors)) {
+              for (const [key, value] of state.cellColors) {
+                const [x, y] = key.split('_').map(Number);
+                paintCell(x, y, value);
+              }
+            }
+            // После закраски — перерисовать фишки
+            redrawTokens(gridSize, placeToken);
+          });
+          refreshTokenList(tokenList, openTokenModal, highlightTokenOnField);
+          // Восстановление значения на кубике и его типа
+          renderDiceFace(diceFace, diceSelect, state.diceFaceValue || '?');
+          // Восстановление цвета кисти
+          if (state.selectedColor) {
+            colorPicker.value = state.selectedColor;
+            selectedColor = state.selectedColor;
+          }
+        } catch (e) { alert('Ошибка загрузки файла!'); }
+      };
+      reader.readAsText(file);
+    });
+  }
+
+  // Вернуться в меню
+  if (backToMenuBtn && menuScreen && mainApp) {
+    backToMenuBtn.addEventListener('click', () => {
+      mainApp.style.display = 'none';
+      menuScreen.style.display = '';
+      document.body.classList.add('menu-bg');
+    });
+  }
 }
 
 function showGlobalTokenTooltip(text, x, y) {
