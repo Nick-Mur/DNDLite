@@ -1,7 +1,0 @@
-fastapi
-uvicorn[standard]
-pydantic
-pytest
-httpx
-passlib[bcrypt]
-python-jose 
