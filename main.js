@@ -20,8 +20,9 @@ window.addEventListener('DOMContentLoaded', async () => {
   let selectedTool = 'brush';
   let selectedColor = document.getElementById('color-picker').value;
   let brushSize = 1;
-  let gridSize = 20;
-  let isPainting = false;
+  let gridSize = parseInt(document.getElementById('grid-size').value);
+  let painting = false;
+  const cellColors = new Map();
 
   // ======= DOM =======
   const gameGrid = document.getElementById('game-grid');
@@ -29,6 +30,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   const clearGridBtn = document.getElementById('clear-grid-btn');
   const brushBtn = document.getElementById('brush-btn');
   const eraserBtn = document.getElementById('eraser-btn');
+  const handBtn = document.getElementById('hand-btn');
   const colorPicker = document.getElementById('color-picker');
   const brushSizeSelect = document.getElementById('brush-size');
   const diceSelect = document.getElementById('dice-select');
@@ -47,53 +49,74 @@ window.addEventListener('DOMContentLoaded', async () => {
   const tokenList = document.getElementById('token-list');
 
   // ======= GRID =======
+  function key(x, y) { return `${x}_${y}`; }
+
+  function setActiveTool(tool) {
+    selectedTool = tool;
+    brushBtn.classList.toggle('bg-blue-200', tool === 'brush');
+    eraserBtn.classList.toggle('bg-red-200', tool === 'eraser');
+    handBtn.classList.toggle('bg-yellow-200', tool === 'hand');
+    gameGrid.style.cursor = (tool === 'brush' || tool === 'eraser') ? 'crosshair' : 'default';
+  }
+
   function buildGrid() {
+    // сохранить текущие цвета
+    cellColors.clear();
+    document.querySelectorAll('.grid-cell').forEach(c => {
+      const bg = c.style.background;
+      if (bg) { cellColors.set(key(c.dataset.x, c.dataset.y), bg); }
+    });
+    // очистить
     gameGrid.innerHTML = '';
-    gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
+    gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, var(--cell-size))`;
+    gameGrid.style.gridAutoRows = 'var(--cell-size)';
+    gameGrid.style.display = 'inline-grid';
     for (let y = 0; y < gridSize; y++) {
       for (let x = 0; x < gridSize; x++) {
         const cell = document.createElement('div');
         cell.className = 'grid-cell';
         cell.dataset.x = x;
         cell.dataset.y = y;
+        const saved = cellColors.get(key(x, y));
+        if (saved) cell.style.background = saved;
         gameGrid.appendChild(cell);
       }
     }
+    // clamp tokens
+    tokens.forEach(t => { t.x = Math.min(gridSize - 1, t.x); t.y = Math.min(gridSize - 1, t.y); });
     redrawTokens();
   }
 
-  // ======= PAINT =======
+  function paintCell(cx, cy, color) {
+    const cell = document.querySelector(`.grid-cell[data-x="${cx}"][data-y="${cy}"]`);
+    if (!cell) return;
+    cell.style.background = color;
+    if (color) cellColors.set(key(cx, cy), color); else cellColors.delete(key(cx, cy));
+  }
+
   function applyTool(x, y) {
     const half = Math.floor(brushSize / 2);
     for (let dy = -half; dy < brushSize - half; dy++) {
       for (let dx = -half; dx < brushSize - half; dx++) {
-        const tx = x + dx;
-        const ty = y + dy;
+        const tx = x + dx, ty = y + dy;
         if (tx < 0 || ty < 0 || tx >= gridSize || ty >= gridSize) continue;
-        const cell = document.querySelector(`.grid-cell[data-x="${tx}"][data-y="${ty}"]`);
-        if (!cell) continue;
-        if (selectedTool === 'brush') {
-          cell.style.background = selectedColor;
-        } else if (selectedTool === 'eraser') {
-          cell.style.background = '';
-        }
+        if (selectedTool === 'brush') paintCell(tx, ty, selectedColor);
+        else if (selectedTool === 'eraser') paintCell(tx, ty, '');
       }
     }
   }
 
   gameGrid.addEventListener('mousedown', e => {
-    const cell = e.target.closest('.grid-cell');
-    if (!cell) return;
-    isPainting = true;
+    if (selectedTool === 'hand') return;
+    const cell = e.target.closest('.grid-cell'); if (!cell) return;
+    painting = true;
     applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
   });
-  gameGrid.addEventListener('mouseover', e => {
-    if (!isPainting) return;
-    const cell = e.target.closest('.grid-cell');
-    if (!cell) return;
+  gameGrid.addEventListener('mousemove', e => {
+    if (!painting) return; const cell = e.target.closest('.grid-cell'); if (!cell) return;
     applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
   });
-  document.addEventListener('mouseup', () => (isPainting = false));
+  document.addEventListener('mouseup', () => painting = false);
 
   // ======= TOKENS =======
   function redrawTokens() {
@@ -107,22 +130,21 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.className = 'token';
     el.dataset.id = t.id;
     el.style.background = t.color;
-    el.innerHTML = `<span>${t.name[0].toUpperCase()}</span><div class='token-tooltip'>${t.name}: ${t.description || ''}</div>`;
+    el.textContent = t.name[0].toUpperCase();
     el.draggable = true;
-    el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', t.id));
+    el.addEventListener('dragstart', ev => {
+      if (selectedTool !== 'hand') { ev.preventDefault(); return; }
+      ev.dataTransfer.setData('text/plain', t.id);
+    });
     cell.appendChild(el);
   }
-  gameGrid.addEventListener('dragover', e => e.preventDefault());
+  gameGrid.addEventListener('dragover', e => { if (selectedTool === 'hand') e.preventDefault(); });
   gameGrid.addEventListener('drop', e => {
-    e.preventDefault();
-    const id = e.dataTransfer.getData('text/plain');
-    const token = tokens.find(tok => tok.id === id);
-    const cell = e.target.closest('.grid-cell');
-    if (!cell || !token) return;
-    token.x = parseInt(cell.dataset.x);
-    token.y = parseInt(cell.dataset.y);
-    redrawTokens();
-    refreshTokenList();
+    if (selectedTool !== 'hand') return; e.preventDefault();
+    const id = e.dataTransfer.getData('text/plain'); const tok = tokens.find(t => t.id === id);
+    const cell = e.target.closest('.grid-cell'); if (!(tok && cell)) return;
+    tok.x = parseInt(cell.dataset.x); tok.y = parseInt(cell.dataset.y);
+    redrawTokens(); refreshTokenList();
   });
 
   // ======= TOKEN MODAL =======
@@ -193,15 +215,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   diceSelect.addEventListener('change',()=>{diceFace.textContent='?'; diceResult.textContent='';});
 
   // ======= TOOLBAR EVENTS =======
-  brushBtn.addEventListener('click',()=>{selectedTool='brush';brushBtn.classList.add('bg-blue-200');eraserBtn.classList.remove('bg-red-200');});
-  eraserBtn.addEventListener('click',()=>{selectedTool='eraser';eraserBtn.classList.add('bg-red-200');brushBtn.classList.remove('bg-blue-200');});
+  brushBtn.addEventListener('click',()=>setActiveTool('brush'));
+  eraserBtn.addEventListener('click',()=>setActiveTool('eraser'));
+  handBtn.addEventListener('click',()=>setActiveTool('hand'));
   colorPicker.addEventListener('input',e=>selectedColor=e.target.value);
   brushSizeSelect.addEventListener('change',e=>brushSize=parseInt(e.target.value));
-  clearGridBtn.addEventListener('click',()=>{document.querySelectorAll('.grid-cell').forEach(c=>c.style.background='');});
-  gridSizeInput.addEventListener('change',()=>{gridSize=parseInt(gridSizeInput.value);buildGrid();});
+  clearGridBtn.addEventListener('click',()=>{document.querySelectorAll('.grid-cell').forEach(c=>c.style.background='');cellColors.clear();});
+  gridSizeInput.addEventListener('change',()=>{gridSize=Math.max(1,Math.min(50,parseInt(gridSizeInput.value)||1));buildGrid();});
 
   // ======= INIT =======
-  brushBtn.click(); // activate brush
+  setActiveTool('brush');
   buildGrid();
 
   // demo tokens
