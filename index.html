@@ -3,65 +3,40 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>D&D Игровое поле — paint‑brush</title>
+  <title>D&D Игровое поле</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://kit.fontawesome.com/a076d05399.js" crossorigin="anonymous"></script>
   <style>
     /* ===== СЕТКА ===== */
-    .grid-cell {
-      position: relative;
-      border: 1px solid #ccc;
-      aspect-ratio: 1 / 1;
-      background: #f9f9f9;
-      transition: background 0.1s;
+    .grid-cell{
+      position:relative;
+      border:1px solid #ccc;
+      aspect-ratio:1/1;
+      background:#f9f9f9;
+      transition:background .1s;
     }
 
     /* ===== ФИШКИ ===== */
-    .token {
-      position: absolute;
-      width: 80%;
-      height: 80%;
-      left: 50%;
-      top: 50%;
-      transform: translate(-50%, -50%);
-      border-radius: 50%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      cursor: move;
-      user-select: none;
-      color: #fff;
-      font-weight: 700;
-      font-size: 12px;
-      text-align: center;
-      box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    .token{
+      position:absolute;
+      width:80%;height:80%;
+      left:50%;top:50%;
+      transform:translate(-50%,-50%);
+      border-radius:50%;
+      display:flex;align-items:center;justify-content:center;
+      font:700 12px/1 system-ui;
+      color:#fff;user-select:none;
+      box-shadow:0 2px 5px rgba(0,0,0,.2);
+      cursor:grab;
     }
-    .token-tooltip {
-      position: absolute;
-      bottom: 100%;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(0, 0, 0, 0.8);
-      color: #fff;
-      padding: 4px 8px;
-      border-radius: 4px;
-      font-size: 12px;
-      white-space: nowrap;
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.2s;
-    }
-    .token:hover .token-tooltip{opacity:1;}
 
     /* ===== КУБИК ===== */
-    .dice-face {
-      width: 60px; height: 60px;
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      background: #f0f0f0;
-      font-size: 24px; font-weight: 700; cursor: pointer;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.2);
-      transition: transform 0.2s;
+    .dice-face{
+      width:60px;height:60px;border-radius:10px;
+      display:flex;align-items:center;justify-content:center;
+      background:#e0eaff;color:#1d4ed8;font:700 24px/1 system-ui;
+      cursor:pointer;transition:transform .2s;
+      box-shadow:0 2px 5px rgba(0,0,0,.2);
     }
     .dice-face:hover{transform:scale(1.05);}
   </style>
@@ -75,15 +50,18 @@
       <div class="bg-white p-4 rounded-lg shadow-md">
         <h2 class="text-xl font-semibold mb-4 text-gray-700">Инструменты</h2>
         <div class="space-y-3">
-          <button id="brush-btn" class="w-full flex items-center px-4 py-2 bg-blue-100 rounded-md">
-            <i class="fas fa-paint-brush mr-2 text-blue-600"></i><span>Кисть</span>
+          <button id="brush-btn" class="w-full flex items-center px-4 py-2 rounded-md">
+            <i class="fas fa-paint-brush mr-2"></i><span>Кисть</span>
           </button>
           <button id="eraser-btn" class="w-full flex items-center px-4 py-2 rounded-md">
-            <i class="fas fa-eraser mr-2 text-red-600"></i><span>Ластик</span>
+            <i class="fas fa-eraser mr-2"></i><span>Ластик</span>
+          </button>
+          <button id="hand-btn" class="w-full flex items-center px-4 py-2 rounded-md">
+            <i class="fas fa-hand-paper mr-2"></i><span>Рука</span>
           </button>
           <div class="flex items-center mt-4">
             <label class="mr-2 text-gray-700">Цвет:</label>
-            <input type="color" id="color-picker" value="#3b82f6" class="w-8 h-8 rounded-full border" />
+            <input id="color-picker" type="color" value="#3b82f6" class="w-8 h-8 rounded-full border" />
           </div>
           <div class="flex items-center mt-2">
             <label class="mr-2 text-gray-700">Размер:</label>
@@ -102,7 +80,7 @@
         <select id="dice-select" class="w-full mb-4 p-2 border rounded-md">
           <option value="4">D4</option><option value="6" selected>D6</option><option value="8">D8</option><option value="10">D10</option><option value="12">D12</option><option value="20">D20</option><option value="100">D100</option>
         </select>
-        <div class="flex justify-center mb-2"><div id="dice-face" class="dice-face bg-blue-100 text-blue-800">?</div></div>
+        <div class="flex justify-center mb-2"><div id="dice-face" class="dice-face">?</div></div>
         <div id="dice-result" class="text-center font-bold text-lg text-gray-700"></div>
       </div>
 
@@ -146,202 +124,204 @@
   </div>
 
   <script>
-    document.addEventListener('DOMContentLoaded', () => {
-      /* ======= STATE ======= */
-      let tokens = [];
-      let currentTokenId = null;
-      let selectedTool = 'brush';
-      let selectedColor = document.getElementById('color-picker').value;
-      let brushSize = 1;
-      let gridSize = 20;
-      let isPainting = false;
+  document.addEventListener('DOMContentLoaded',()=>{
+    /* === STATE === */
+    let tokens=[];
+    let currentTokenId=null;
+    let selectedTool='brush';
+    let selectedColor=document.getElementById('color-picker').value;
+    let brushSize=1;
+    let gridSize=parseInt(document.getElementById('grid-size').value);
+    let painting=false;
 
-      /* ======= DOM ======= */
-      const gameGrid = document.getElementById('game-grid');
-      const gridSizeInput = document.getElementById('grid-size');
-      const clearGridBtn = document.getElementById('clear-grid-btn');
-      const brushBtn = document.getElementById('brush-btn');
-      const eraserBtn = document.getElementById('eraser-btn');
-      const colorPicker = document.getElementById('color-picker');
-      const brushSizeSelect = document.getElementById('brush-size');
-      const diceSelect = document.getElementById('dice-select');
-      const diceFace = document.getElementById('dice-face');
-      const diceResult = document.getElementById('dice-result');
-      const tokenModal = document.getElementById('token-modal');
-      const createTokenBtn = document.getElementById('create-token-btn');
-      const tokenNameInput = document.getElementById('token-name');
-      const tokenColorInput = document.getElementById('token-color');
-      const tokenDescInput = document.getElementById('token-description');
-      const tokenXInput = document.getElementById('token-x');
-      const tokenYInput = document.getElementById('token-y');
-      const deleteTokenBtn = document.getElementById('delete-token-btn');
-      const cancelTokenBtn = document.getElementById('cancel-token-btn');
-      const saveTokenBtn = document.getElementById('save-token-btn');
-      const tokenList = document.getElementById('token-list');
+    /* === DOM === */
+    const gameGrid=document.getElementById('game-grid');
+    const brushBtn=document.getElementById('brush-btn');
+    const eraserBtn=document.getElementById('eraser-btn');
+    const handBtn=document.getElementById('hand-btn');
+    const colorPicker=document.getElementById('color-picker');
+    const brushSizeSelect=document.getElementById('brush-size');
+    const gridSizeInput=document.getElementById('grid-size');
+    const clearGridBtn=document.getElementById('clear-grid-btn');
+    const diceSelect=document.getElementById('dice-select');
+    const diceFace=document.getElementById('dice-face');
+    const diceResult=document.getElementById('dice-result');
+    const tokenModal=document.getElementById('token-modal');
+    const createTokenBtn=document.getElementById('create-token-btn');
+    const tokenNameInput=document.getElementById('token-name');
+    const tokenColorInput=document.getElementById('token-color');
+    const tokenDescInput=document.getElementById('token-description');
+    const tokenXInput=document.getElementById('token-x');
+    const tokenYInput=document.getElementById('token-y');
+    const deleteTokenBtn=document.getElementById('delete-token-btn');
+    const cancelTokenBtn=document.getElementById('cancel-token-btn');
+    const saveTokenBtn=document.getElementById('save-token-btn');
+    const tokenList=document.getElementById('token-list');
 
-      /* ======= GRID ======= */
-      function buildGrid() {
-        gameGrid.innerHTML = '';
-        gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, 1fr)`;
-        for (let y = 0; y < gridSize; y++) {
-          for (let x = 0; x < gridSize; x++) {
-            const cell = document.createElement('div');
-            cell.className = 'grid-cell';
-            cell.dataset.x = x;
-            cell.dataset.y = y;
-            gameGrid.appendChild(cell);
-          }
-        }
-        redrawTokens();
-      }
+    /* === HELPERS === */
+    function setActiveTool(tool){
+      selectedTool=tool;
+      brushBtn.classList.toggle('bg-blue-200',tool==='brush');
+      eraserBtn.classList.toggle('bg-red-200',tool==='eraser');
+      handBtn.classList.toggle('bg-yellow-200',tool==='hand');
+      gameGrid.style.cursor=(tool==='brush'||tool==='eraser')?'crosshair':'default';
+    }
 
-      /* ======= PAINT ======= */
-      function applyTool(x, y) {
-        const half = Math.floor(brushSize / 2);
-        for (let dy = -half; dy < brushSize - half; dy++) {
-          for (let dx = -half; dx < brushSize - half; dx++) {
-            const tx = x + dx;
-            const ty = y + dy;
-            if (tx < 0 || ty < 0 || tx >= gridSize || ty >= gridSize) continue;
-            const cell = document.querySelector(`.grid-cell[data-x="${tx}"][data-y="${ty}"]`);
-            if (!cell) continue;
-            if (selectedTool === 'brush') {
-              cell.style.background = selectedColor;
-            } else if (selectedTool === 'eraser') {
-              cell.style.background = '';
-            }
-          }
+    /* === GRID === */
+    function buildGrid(){
+      gameGrid.innerHTML='';
+      gameGrid.style.gridTemplateColumns=`repeat(${gridSize},1fr)`;
+      for(let y=0;y<gridSize;y++){
+        for(let x=0;x<gridSize;x++){
+          const cell=document.createElement('div');
+          cell.className='grid-cell';
+          cell.dataset.x=x;
+          cell.dataset.y=y;
+          gameGrid.appendChild(cell);
         }
       }
-
-      gameGrid.addEventListener('mousedown', e => {
-        const cell = e.target.closest('.grid-cell');
-        if (!cell) return;
-        isPainting = true;
-        applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
-      });
-      gameGrid.addEventListener('mouseover', e => {
-        if (!isPainting) return;
-        const cell = e.target.closest('.grid-cell');
-        if (!cell) return;
-        applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
-      });
-      document.addEventListener('mouseup', () => (isPainting = false));
-
-      /* ======= TOKENS ======= */
-      function redrawTokens() {
-        tokens.forEach(placeToken);
-      }
-      function placeToken(t) {
-        document.querySelector(`.token[data-id="${t.id}"]`)?.remove();
-        const cell = document.querySelector(`.grid-cell[data-x="${t.x}"][data-y="${t.y}"]`);
-        if (!cell) return;
-        const el = document.createElement('div');
-        el.className = 'token';
-        el.dataset.id = t.id;
-        el.style.background = t.color;
-        el.innerHTML = `<span>${t.name[0].toUpperCase()}</span><div class='token-tooltip'>${t.name}: ${t.description || ''}</div>`;
-        el.draggable = true;
-        el.addEventListener('dragstart', e => e.dataTransfer.setData('text/plain', t.id));
-        cell.appendChild(el);
-      }
-      gameGrid.addEventListener('dragover', e => e.preventDefault());
-      gameGrid.addEventListener('drop', e => {
-        e.preventDefault();
-        const id = e.dataTransfer.getData('text/plain');
-        const token = tokens.find(tok => tok.id === id);
-        const cell = e.target.closest('.grid-cell');
-        if (!cell || !token) return;
-        token.x = parseInt(cell.dataset.x);
-        token.y = parseInt(cell.dataset.y);
-        redrawTokens();
-        refreshTokenList();
-      });
-
-      /* ======= TOKEN MODAL ======= */
-      function openTokenModal(tok=null) {
-        if (tok) {
-          currentTokenId = tok.id;
-          tokenNameInput.value = tok.name;
-          tokenColorInput.value = tok.color;
-          tokenDescInput.value = tok.description;
-          tokenXInput.value = tok.x;
-          tokenYInput.value = tok.y;
-          deleteTokenBtn.classList.remove('hidden');
-        } else {
-          currentTokenId = null;
-          tokenNameInput.value = '';
-          tokenColorInput.value = '#3b82f6';
-          tokenDescInput.value = '';
-          tokenXInput.value = 0;
-          tokenYInput.value = 0;
-          deleteTokenBtn.classList.add('hidden');
-        }
-        tokenModal.classList.remove('hidden');
-        tokenModal.classList.add('flex');
-      }
-      function closeTokenModal(){ tokenModal.classList.add('hidden'); tokenModal.classList.remove('flex'); }
-
-      saveTokenBtn.addEventListener('click', () => {
-        const name = tokenNameInput.value.trim();
-        if (!name) return alert('Введите имя');
-        const color = tokenColorInput.value;
-        const x = parseInt(tokenXInput.value), y = parseInt(tokenYInput.value);
-        if (x<0||y<0||x>=gridSize||y>=gridSize) return alert('Вне поля');
-        const desc = tokenDescInput.value.trim();
-        if (currentTokenId) {
-          Object.assign(tokens.find(t=>t.id===currentTokenId),{name,color,description:desc,x,y});
-        } else {
-          tokens.push({id:Date.now().toString(),name,color,description:desc,x,y});
-        }
-        redrawTokens();
-        refreshTokenList();
-        closeTokenModal();
-      });
-      deleteTokenBtn.addEventListener('click',()=>{
-        tokens = tokens.filter(t=>t.id!==currentTokenId);
-        redrawTokens(); refreshTokenList(); closeTokenModal();
-      });
-      cancelTokenBtn.addEventListener('click',closeTokenModal);
-      createTokenBtn.addEventListener('click',()=>openTokenModal());
-
-      function refreshTokenList() {
-        tokenList.innerHTML='';
-        tokens.forEach(tok=>{
-          const div=document.createElement('div');
-          div.className='flex items-center p-2 rounded hover:bg-gray-100 cursor-pointer';
-          div.innerHTML=`<span class='inline-block w-4 h-4 rounded-full mr-2' style='background:${tok.color}'></span>${tok.name}`;
-          div.addEventListener('click',()=>openTokenModal(tok));
-          tokenList.appendChild(div);
-        });
-      }
-
-      /* ======= DICE ======= */
-      function rollDice(){
-        const sides=parseInt(diceSelect.value); const res=Math.floor(Math.random()*sides)+1;
-        diceFace.textContent='…'; diceFace.style.transform='rotate(360deg) scale(1.2)';
-        setTimeout(()=>{diceFace.style.transform='rotate(0) scale(1)'; diceFace.textContent=res; diceResult.textContent=`Выпало: ${res}`;},500);
-      }
-      diceFace.addEventListener('click',rollDice);
-      diceSelect.addEventListener('change',()=>{diceFace.textContent='?'; diceResult.textContent='';});
-
-      /* ======= TOOLBAR EVENTS ======= */
-      brushBtn.addEventListener('click',()=>{selectedTool='brush';brushBtn.classList.add('bg-blue-200');eraserBtn.classList.remove('bg-red-200');});
-      eraserBtn.addEventListener('click',()=>{selectedTool='eraser';eraserBtn.classList.add('bg-red-200');brushBtn.classList.remove('bg-blue-200');});
-      colorPicker.addEventListener('input',e=>selectedColor=e.target.value);
-      brushSizeSelect.addEventListener('change',e=>brushSize=parseInt(e.target.value));
-      clearGridBtn.addEventListener('click',()=>{document.querySelectorAll('.grid-cell').forEach(c=>c.style.background='');});
-      gridSizeInput.addEventListener('change',()=>{gridSize=parseInt(gridSizeInput.value);buildGrid();});
-
-      /* ======= INIT ======= */
-      brushBtn.click(); // activate brush
-      buildGrid();
-
-      // demo tokens
-      tokens=[{id:'1',name:'Игрок 1',color:'#3b82f6',description:'Воин',x:5,y:5},{id:'2',name:'Игрок 2',color:'#ef4444',description:'Маг',x:7,y:5}];
       redrawTokens();
-      refreshTokenList();
+    }
+
+    function applyTool(x,y){
+      const half=Math.floor(brushSize/2);
+      for(let dy=-half;dy<brushSize-half;dy++){
+        for(let dx=-half;dx<brushSize-half;dx++){
+          const tx=x+dx, ty=y+dy;
+          if(tx<0||ty<0||tx>=gridSize||ty>=gridSize) continue;
+          const cell=document.querySelector(`.grid-cell[data-x="${tx}"][data-y="${ty}"]`);
+          if(!cell) continue;
+          if(selectedTool==='brush') cell.style.background=selectedColor;
+          else if(selectedTool==='eraser') cell.style.background='';
+        }
+      }
+    }
+
+    gameGrid.addEventListener('mousedown',e=>{
+      if(selectedTool==='hand') return;
+      const c=e.target.closest('.grid-cell'); if(!c) return;
+      painting=true; applyTool(parseInt(c.dataset.x),parseInt(c.dataset.y));
     });
+    gameGrid.addEventListener('mousemove',e=>{
+      if(!painting) return; const c=e.target.closest('.grid-cell'); if(!c) return;
+      applyTool(parseInt(c.dataset.x),parseInt(c.dataset.y));
+    });
+    document.addEventListener('mouseup',()=>painting=false);
+
+    /* === TOKENS === */
+    function placeToken(tok){
+      document.querySelector(`.token[data-id="${tok.id}"]`)?.remove();
+      const cell=document.querySelector(`.grid-cell[data-x="${tok.x}"][data-y="${tok.y}"]`);
+      if(!cell) return;
+      const el=document.createElement('div');
+      el.className='token';
+      el.dataset.id=tok.id;
+      el.style.background=tok.color;
+      el.textContent=tok.name[0].toUpperCase();
+      el.draggable=true;
+      el.addEventListener('dragstart',ev=>{
+        if(selectedTool!=='hand'){ev.preventDefault();return;}
+        ev.dataTransfer.setData('text/plain',tok.id);
+      });
+      cell.appendChild(el);
+    }
+    function redrawTokens(){ tokens.forEach(placeToken);}
+
+    gameGrid.addEventListener('dragover',e=>{
+      if(selectedTool!=='hand') return; e.preventDefault();
+    });
+    gameGrid.addEventListener('drop',e=>{
+      if(selectedTool!=='hand') return; e.preventDefault();
+      const id=e.dataTransfer.getData('text/plain');
+      const tok=tokens.find(t=>t.id===id);
+      const cell=e.target.closest('.grid-cell');
+      if(!(tok&&cell)) return;
+      tok.x=parseInt(cell.dataset.x); tok.y=parseInt(cell.dataset.y);
+      redrawTokens(); refreshTokenList();
+    });
+
+    /* === TOKEN MODAL === */
+    function openTokenModal(tok=null){
+      if(tok){
+        currentTokenId=tok.id;
+        tokenNameInput.value=tok.name;
+        tokenColorInput.value=tok.color;
+        tokenDescInput.value=tok.description;
+        tokenXInput.value=tok.x;
+        tokenYInput.value=tok.y;
+        deleteTokenBtn.classList.remove('hidden');
+      }else{
+        currentTokenId=null;
+        tokenNameInput.value='';
+        tokenColorInput.value='#3b82f6';
+        tokenDescInput.value='';
+        tokenXInput.value=0; tokenYInput.value=0;
+        deleteTokenBtn.classList.add('hidden');
+      }
+      tokenModal.classList.remove('hidden'); tokenModal.classList.add('flex');
+    }
+    function closeTokenModal(){ tokenModal.classList.add('hidden'); tokenModal.classList.remove('flex'); }
+
+    saveTokenBtn.addEventListener('click',()=>{
+      const name=tokenNameInput.value.trim(); if(!name) return alert('Введите имя');
+      const color=tokenColorInput.value;
+      const x=parseInt(tokenXInput.value), y=parseInt(tokenYInput.value);
+      if(x<0||y<0||x>=gridSize||y>=gridSize) return alert('Позиция вне поля');
+      const desc=tokenDescInput.value.trim();
+      if(currentTokenId){
+        Object.assign(tokens.find(t=>t.id===currentTokenId),{name,color,description:desc,x,y});
+      }else{
+        tokens.push({id:Date.now().toString(),name,color,description:desc,x,y});
+      }
+      redrawTokens(); refreshTokenList(); closeTokenModal();
+    });
+    deleteTokenBtn.addEventListener('click',()=>{
+      tokens=tokens.filter(t=>t.id!==currentTokenId);
+      redrawTokens(); refreshTokenList(); closeTokenModal();
+    });
+    cancelTokenBtn.addEventListener('click',closeTokenModal);
+    createTokenBtn.addEventListener('click',()=>openTokenModal());
+
+    function refreshTokenList(){
+      tokenList.innerHTML='';
+      tokens.forEach(tok=>{
+        const row=document.createElement('div');
+        row.className='flex items-center p-2 rounded hover:bg-gray-100 cursor-pointer';
+        row.innerHTML=`<span class='inline-block w-4 h-4 rounded-full mr-2' style='background:${tok.color}'></span>${tok.name}`;
+        row.addEventListener('click',()=>openTokenModal(tok));
+        tokenList.appendChild(row);
+      });
+    }
+
+    /* === DICE === */
+    function rollDice(){
+      const sides=parseInt(diceSelect.value);
+      const result=Math.floor(Math.random()*sides)+1;
+      diceFace.textContent='…'; diceFace.style.transform='rotate(360deg) scale(1.2)';
+      setTimeout(()=>{
+        diceFace.style.transform='rotate(0) scale(1)';
+        diceFace.textContent=result;
+        diceResult.textContent=`Выпало: ${result}`;
+      },500);
+    }
+    diceFace.addEventListener('click',rollDice);
+    diceSelect.addEventListener('change',()=>{diceFace.textContent='?'; diceResult.textContent='';});
+
+    /* === TOOLBAR EVENTS === */
+    brushBtn.addEventListener('click',()=>setActiveTool('brush'));
+    eraserBtn.addEventListener('click',()=>setActiveTool('eraser'));
+    handBtn.addEventListener('click',()=>setActiveTool('hand'));
+    colorPicker.addEventListener('input',e=>selectedColor=e.target.value);
+    brushSizeSelect.addEventListener('change',e=>brushSize=parseInt(e.target.value));
+    clearGridBtn.addEventListener('click',()=>document.querySelectorAll('.grid-cell').forEach(c=>c.style.background=''));
+    gridSizeInput.addEventListener('change',()=>{gridSize=parseInt(gridSizeInput.value); buildGrid();});
+
+    /* === INIT === */
+    setActiveTool('brush');
+    buildGrid();
+    tokens=[{id:'1',name:'Игрок',color:'#3b82f6',description:'',x:5,y:5}];
+    redrawTokens(); refreshTokenList();
+  });
   </script>
 </body>
 </html>
