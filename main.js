@@ -256,14 +256,28 @@ window.addEventListener('DOMContentLoaded', async () => {
   cancelTokenBtn.addEventListener('click',closeTokenModal);
   createTokenBtn.addEventListener('click',()=>openTokenModal());
 
+  // Подсветка фишки на поле при наведении на строку в списке
+  function highlightTokenOnField(tokenId, highlight) {
+    const tokenEl = document.querySelector(`.token[data-id="${tokenId}"]`);
+    if (tokenEl) {
+      if (highlight) {
+        tokenEl.classList.add('highlight');
+      } else {
+        tokenEl.classList.remove('highlight');
+      }
+    }
+  }
+
   function refreshTokenList() {
-    tokenList.innerHTML='';
-    tokens.forEach(tok=>{
-      const div=document.createElement('div');
-      div.className='flex items-center p-2 rounded hover:bg-gray-100 cursor-pointer';
-      div.innerHTML=`<span class='inline-block w-4 h-4 rounded-full mr-2' style='background:${tok.color}'></span>${tok.name}`;
-      div.addEventListener('click',()=>openTokenModal(tok));
-      tokenList.appendChild(div);
+    tokenList.innerHTML = '';
+    tokens.forEach(tok => {
+      const row = document.createElement('div');
+      row.className = 'flex items-center p-2 rounded hover:bg-gray-100 cursor-pointer';
+      row.innerHTML = `<span class='inline-block w-4 h-4 rounded-full mr-2' style='background:${tok.color}'></span>${tok.name}`;
+      row.addEventListener('click', () => openTokenModal(tok));
+      row.addEventListener('mouseenter', () => highlightTokenOnField(tok.id, true));
+      row.addEventListener('mouseleave', () => highlightTokenOnField(tok.id, false));
+      tokenList.appendChild(row);
     });
   }
 
