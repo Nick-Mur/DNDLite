@@ -21,6 +21,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   let gridSize = parseInt(document.getElementById('grid-size').value);
   let painting = false;
   const cellColors = new Map();
+  const MAX_GRID_SIZE = 50;
+  let gridInitialized = false;
 
   // ======= DOM =======
   const gameGrid = document.getElementById('game-grid');
@@ -62,30 +64,33 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   function buildGrid() {
-    // сохранить текущие цвета
-    cellColors.clear();
-    document.querySelectorAll('.grid-cell').forEach(c => {
-      const bg = c.style.background;
-      if (bg) { cellColors.set(key(c.dataset.x, c.dataset.y), bg); }
-    });
-    // очистить
-    gameGrid.innerHTML = '';
+    if (!gridInitialized) {
+      gameGrid.innerHTML = '';
+      for (let y = 0; y < MAX_GRID_SIZE; y++) {
+        for (let x = 0; x < MAX_GRID_SIZE; x++) {
+          const cell = document.createElement('div');
+          cell.className = 'grid-cell';
+          cell.dataset.x = x;
+          cell.dataset.y = y;
+          gameGrid.appendChild(cell);
+        }
+      }
+      gridInitialized = true;
+    }
+    // Показываем/скрываем клетки
+    for (let y = 0; y < MAX_GRID_SIZE; y++) {
+      for (let x = 0; x < MAX_GRID_SIZE; x++) {
+        const cell = gameGrid.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`);
+        if (x < gridSize && y < gridSize) {
+          cell.style.display = '';
+        } else {
+          cell.style.display = 'none';
+        }
+      }
+    }
     gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, var(--cell-size))`;
     gameGrid.style.gridAutoRows = 'var(--cell-size)';
     gameGrid.style.display = 'inline-grid';
-    for (let y = 0; y < gridSize; y++) {
-      for (let x = 0; x < gridSize; x++) {
-        const cell = document.createElement('div');
-        cell.className = 'grid-cell';
-        cell.dataset.x = x;
-        cell.dataset.y = y;
-        const saved = cellColors.get(key(x, y));
-        if (saved) cell.style.background = saved;
-        gameGrid.appendChild(cell);
-      }
-    }
-    // clamp tokens
-    tokens.forEach(t => { t.x = Math.min(gridSize - 1, t.x); t.y = Math.min(gridSize - 1, t.y); });
     redrawTokens();
   }
 
@@ -156,6 +161,8 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   function placeToken(t) {
+    // Не рендерим фишку, если она вне видимой области
+    if (t.x >= gridSize || t.y >= gridSize) return;
     document.querySelector(`.token[data-id="${t.id}"]`)?.remove();
     const cell = document.querySelector(`.grid-cell[data-x="${t.x}"][data-y="${t.y}"]`);
     if (!cell) return;
@@ -174,11 +181,12 @@ window.addEventListener('DOMContentLoaded', async () => {
       if(selectedTool==='hand') {
         const rect = el.getBoundingClientRect();
         const tooltipText = t.name.slice(0, 20);
-        // Позиционируем tooltip строго под фишкой, но если не помещается — над фишкой
         const tooltipHeight = 28; // примерно
-        let top = rect.bottom + 6;
-        if (rect.bottom + tooltipHeight + 10 > window.innerHeight) {
-          top = rect.top - tooltipHeight - 6;
+        // По умолчанию — сверху
+        let top = rect.top - tooltipHeight - 6;
+        // Если не помещается сверху — снизу
+        if (top < 0) {
+          top = rect.bottom + 6;
         }
         showGlobalTokenTooltip(tooltipText, rect.left + rect.width/2, top);
         globalTokenTooltip.style.transform = 'translate(-50%, 0)';
