@@ -6,12 +6,10 @@ async function loadSection(url, containerId) {
 
 // Загружаем все секции после загрузки DOM
 window.addEventListener('DOMContentLoaded', async () => {
-  // Основные секции
+  await loadSection('tools.html', 'tools-section');
+  await loadSection('dice.html', 'dice-section');
   await loadSection('tokens.html', 'main-content');
-  await loadSection('dice.html', 'main-content');
-  await loadSection('tools.html', 'main-content');
   await loadSection('field.html', 'main-content');
-  // Модальные окна
   await loadSection('token-modal.html', 'modals');
 
   // ======= STATE =======
