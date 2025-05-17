@@ -185,7 +185,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.className = 'token';
     el.dataset.id = t.id;
     el.style.background = t.color;
-    el.textContent = t.name[0].toUpperCase(); // Первая буква имени
+    // Показываем первую графему имени (буква или эмодзи)
+    // Array.from корректно работает с эмодзи и суррогатными парами
+    el.textContent = Array.from(t.name)[0]?.toUpperCase?.() || '';
     el.draggable = true;
     // Обработка начала перетаскивания
     el.addEventListener('dragstart', ev => {
@@ -196,7 +198,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     el.addEventListener('mouseenter', function(e) {
       if(selectedTool==='hand') {
         const rect = el.getBoundingClientRect();
-        const tooltipText = t.name.slice(0, 20);
+        // Обрезаем имя по графемам, чтобы не разрывать эмодзи
+        const graphemes = Array.from(t.name);
+        const tooltipText = graphemes.slice(0, 20).join('');
         const tooltipHeight = 28; // примерно
         // По умолчанию — сверху
         let top = rect.top - tooltipHeight - 6;
