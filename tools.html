@@ -1,10 +1,17 @@
+<!-- Секция инструментов: кисть, ластик, рука, выбор цвета и размера -->
 <div class="bg-white p-4 rounded-lg shadow-md">
+  <!-- Заголовок секции -->
   <h2 class="text-xl font-semibold mb-4 text-gray-700">Инструменты</h2>
   <div class="space-y-3">
+    <!-- Кнопка выбора кисти -->
     <button id="brush-btn" class="w-full flex items-center px-4 py-2 rounded-md"><i class="fas fa-paint-brush mr-2"></i>Кисть</button>
+    <!-- Кнопка выбора ластика -->
     <button id="eraser-btn" class="w-full flex items-center px-4 py-2 rounded-md"><i class="fas fa-eraser mr-2"></i>Ластик</button>
+    <!-- Кнопка выбора инструмента "рука" -->
     <button id="hand-btn" class="w-full flex items-center px-4 py-2 rounded-md"><i class="fas fa-hand-paper mr-2"></i>Рука</button>
+    <!-- Выбор цвета кисти -->
     <div class="flex items-center mt-4"><label class="mr-2">Цвет:</label><input id="color-picker" type="color" value="#3b82f6" class="w-8 h-8 rounded-full border"></div>
+    <!-- Выбор размера кисти -->
     <div class="flex items-center mt-2"><label class="mr-2">Размер:</label><select id="brush-size" class="p-1 border rounded"><option value="1" selected>1</option><option value="2">2</option><option value="3">3</option></select></div>
   </div>
 </div> 

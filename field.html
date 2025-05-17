@@ -1,8 +1,14 @@
+<!-- Секция игрового поля -->
 <div class="lg:col-span-3 bg-white p-4 rounded-lg shadow-md">
+  <!-- Заголовок секции -->
   <h2 class="text-xl font-semibold mb-4 text-gray-700">Игровое поле</h2>
+  <!-- Панель управления размером сетки и очисткой -->
   <div class="flex justify-between items-center mb-4">
+    <!-- Ввод размера сетки -->
     <div><label class="mr-2">Размер сетки</label><input id="grid-size" type="number" min="1" value="36" class="w-24 p-1 border rounded-md"></div>
+    <!-- Кнопка очистки поля -->
     <button id="clear-grid-btn" class="bg-gray-200 text-gray-700 py-1 px-3 rounded-md hover:bg-gray-300">Очистить поле</button>
   </div>
+  <!-- Контейнер для самой сетки -->
   <div id="game-grid" class="grid border border-gray-300" style="max-height:600px; max-width:100%; overflow:auto; display:inline-grid;"></div>
 </div> 

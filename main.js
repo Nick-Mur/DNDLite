@@ -1,60 +1,64 @@
+// Функция для загрузки HTML-секции по URL и вставки в указанный контейнер
 async function loadSection(url, containerId) {
-  const resp = await fetch(url);
-  const html = await resp.text();
-  document.getElementById(containerId).insertAdjacentHTML('beforeend', html);
+  const resp = await fetch(url); // Загружаем содержимое файла по URL
+  const html = await resp.text(); // Получаем текстовое содержимое
+  document.getElementById(containerId).insertAdjacentHTML('beforeend', html); // Вставляем HTML в контейнер
 }
 
-// Загружаем все секции после загрузки DOM
+// После загрузки DOM загружаем все секции интерфейса
 window.addEventListener('DOMContentLoaded', async () => {
-  await loadSection('tools.html', 'tools-section');
-  await loadSection('dice.html', 'dice-section');
-  await loadSection('tokens.html', 'main-content');
-  await loadSection('field.html', 'main-content');
-  await loadSection('token-modal.html', 'modals');
+  await loadSection('tools.html', 'tools-section'); // Инструменты
+  await loadSection('dice.html', 'dice-section'); // Кубик
+  await loadSection('tokens.html', 'main-content'); // Список фишек
+  await loadSection('field.html', 'main-content'); // Игровое поле
+  await loadSection('token-modal.html', 'modals'); // Модальное окно для фишек
 
-  // ======= STATE =======
-  let tokens = [];
-  let currentTokenId = null;
-  let selectedTool = 'brush';
-  let selectedColor = document.getElementById('color-picker').value;
-  let brushSize = 1;
-  let gridSize = parseInt(document.getElementById('grid-size').value);
-  let painting = false;
-  const cellColors = new Map();
-  const MAX_GRID_SIZE = 50;
-  let gridInitialized = false;
+  // ======= ГЛОБАЛЬНОЕ СОСТОЯНИЕ =======
+  let tokens = []; // Массив всех фишек на поле
+  let currentTokenId = null; // ID текущей редактируемой фишки
+  let selectedTool = 'brush'; // Выбранный инструмент (кисть, ластик, рука)
+  let selectedColor = document.getElementById('color-picker').value; // Текущий цвет кисти
+  let brushSize = 1; // Размер кисти
+  let gridSize = parseInt(document.getElementById('grid-size').value); // Размер сетки (количество клеток)
+  let painting = false; // Флаг: идёт ли сейчас рисование
+  const cellColors = new Map(); // Карта цветов клеток (ключ — координаты, значение — цвет)
+  const MAX_GRID_SIZE = 50; // Максимальный размер сетки
+  let gridInitialized = false; // Флаг: инициализирована ли сетка
 
-  // ======= DOM =======
-  const gameGrid = document.getElementById('game-grid');
-  const gridSizeInput = document.getElementById('grid-size');
-  const clearGridBtn = document.getElementById('clear-grid-btn');
-  const brushBtn = document.getElementById('brush-btn');
-  const eraserBtn = document.getElementById('eraser-btn');
-  const handBtn = document.getElementById('hand-btn');
-  const colorPicker = document.getElementById('color-picker');
-  const brushSizeSelect = document.getElementById('brush-size');
-  const diceSelect = document.getElementById('dice-select');
-  const diceFace = document.getElementById('dice-face');
-  const diceResult = document.getElementById('dice-result');
-  const tokenModal = document.getElementById('token-modal');
-  const createTokenBtn = document.getElementById('create-token-btn');
-  const tokenNameInput = document.getElementById('token-name');
-  const tokenColorInput = document.getElementById('token-color');
-  const tokenDescInput = document.getElementById('token-description');
-  const tokenXInput = document.getElementById('token-x');
-  const tokenYInput = document.getElementById('token-y');
-  const deleteTokenBtn = document.getElementById('delete-token-btn');
-  const cancelTokenBtn = document.getElementById('cancel-token-btn');
-  const saveTokenBtn = document.getElementById('save-token-btn');
-  const tokenList = document.getElementById('token-list');
+  // ======= ССЫЛКИ НА DOM-ЭЛЕМЕНТЫ =======
+  const gameGrid = document.getElementById('game-grid'); // Контейнер сетки
+  const gridSizeInput = document.getElementById('grid-size'); // Поле ввода размера сетки
+  const clearGridBtn = document.getElementById('clear-grid-btn'); // Кнопка очистки поля
+  const brushBtn = document.getElementById('brush-btn'); // Кнопка "Кисть"
+  const eraserBtn = document.getElementById('eraser-btn'); // Кнопка "Ластик"
+  const handBtn = document.getElementById('hand-btn'); // Кнопка "Рука"
+  const colorPicker = document.getElementById('color-picker'); // Палитра цветов
+  const brushSizeSelect = document.getElementById('brush-size'); // Выбор размера кисти
+  const diceSelect = document.getElementById('dice-select'); // Выбор типа кубика
+  const diceFace = document.getElementById('dice-face'); // Визуализация кубика
+  const diceResult = document.getElementById('dice-result'); // Результат броска
+  const tokenModal = document.getElementById('token-modal'); // Модальное окно фишки
+  const createTokenBtn = document.getElementById('create-token-btn'); // Кнопка создания фишки
+  const tokenNameInput = document.getElementById('token-name'); // Поле имени фишки
+  const tokenColorInput = document.getElementById('token-color'); // Цвет фишки
+  const tokenDescInput = document.getElementById('token-description'); // Описание фишки
+  const tokenXInput = document.getElementById('token-x'); // X-координата фишки
+  const tokenYInput = document.getElementById('token-y'); // Y-координата фишки
+  const deleteTokenBtn = document.getElementById('delete-token-btn'); // Кнопка удаления фишки
+  const cancelTokenBtn = document.getElementById('cancel-token-btn'); // Кнопка отмены
+  const saveTokenBtn = document.getElementById('save-token-btn'); // Кнопка сохранения
+  const tokenList = document.getElementById('token-list'); // Список фишек
 
-  // ======= GRID =======
+  // ======= ЛОГИКА СЕТКИ =======
+  // Генерируем ключ для координат клетки
   function key(x, y) { return `${x}_${y}`; }
 
+  // Проверяем, занята ли клетка фишкой (кроме указанной)
   function isOccupied(x, y, exclude = null) {
     return tokens.some(t => t.x === x && t.y === y && t.id !== exclude);
   }
 
+  // Устанавливаем активный инструмент и меняем стили кнопок
   function setActiveTool(tool) {
     selectedTool = tool;
     brushBtn.classList.toggle('bg-blue-200', tool === 'brush');
@@ -63,6 +67,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     gameGrid.style.cursor = (tool === 'brush' || tool === 'eraser') ? 'crosshair' : 'default';
   }
 
+  // Строим сетку (создаём клетки, скрываем лишние)
   function buildGrid() {
     if (!gridInitialized) {
       gameGrid.innerHTML = '';
@@ -77,7 +82,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       }
       gridInitialized = true;
     }
-    // Показываем/скрываем клетки
+    // Показываем или скрываем клетки в зависимости от размера поля
     for (let y = 0; y < MAX_GRID_SIZE; y++) {
       for (let x = 0; x < MAX_GRID_SIZE; x++) {
         const cell = gameGrid.querySelector(`.grid-cell[data-x="${x}"][data-y="${y}"]`);
@@ -88,12 +93,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         }
       }
     }
+    // Обновляем стили сетки
     gameGrid.style.gridTemplateColumns = `repeat(${gridSize}, var(--cell-size))`;
     gameGrid.style.gridAutoRows = 'var(--cell-size)';
     gameGrid.style.display = 'inline-grid';
-    redrawTokens();
+    redrawTokens(); // Перерисовываем фишки
   }
 
+  // Закрашиваем клетку и сохраняем цвет
   function paintCell(cx, cy, color) {
     const cell = document.querySelector(`.grid-cell[data-x="${cx}"][data-y="${cy}"]`);
     if (!cell) return;
@@ -101,6 +108,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (color) cellColors.set(key(cx, cy), color); else cellColors.delete(key(cx, cy));
   }
 
+  // Применяем инструмент (кисть/ластик) к области вокруг клетки
   function applyTool(x, y) {
     const half = Math.floor(brushSize / 2);
     for (let dy = -half; dy < brushSize - half; dy++) {
@@ -113,19 +121,23 @@ window.addEventListener('DOMContentLoaded', async () => {
     }
   }
 
+  // Обработчик нажатия мыши по сетке (начало рисования)
   gameGrid.addEventListener('mousedown', e => {
     if (selectedTool === 'hand') return;
     const cell = e.target.closest('.grid-cell'); if (!cell) return;
     painting = true;
     applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
   });
+  // Обработчик движения мыши по сетке (рисование при зажатой кнопке)
   gameGrid.addEventListener('mousemove', e => {
     if (!painting) return; const cell = e.target.closest('.grid-cell'); if (!cell) return;
     applyTool(parseInt(cell.dataset.x), parseInt(cell.dataset.y));
   });
+  // Обработчик отпускания кнопки мыши (завершение рисования)
   document.addEventListener('mouseup', () => painting = false);
 
-  // ======= TOKENS =======
+  // ======= ФИШКИ =======
+  // Перерисовываем все фишки на поле
   function redrawTokens() {
     document.querySelectorAll('.token').forEach(e => e.remove());
     tokens.forEach(placeToken);
@@ -150,28 +162,32 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.body.appendChild(globalTokenTooltip);
   }
 
+  // Показываем tooltip с именем фишки
   function showGlobalTokenTooltip(text, x, y) {
     globalTokenTooltip.textContent = text;
     globalTokenTooltip.style.left = x + 'px';
     globalTokenTooltip.style.top = y + 'px';
     globalTokenTooltip.style.opacity = '1';
   }
+  // Скрываем tooltip
   function hideGlobalTokenTooltip() {
     globalTokenTooltip.style.opacity = '0';
   }
 
+  // Размещаем фишку на поле
   function placeToken(t) {
     // Не рендерим фишку, если она вне видимой области
     if (t.x >= gridSize || t.y >= gridSize) return;
-    document.querySelector(`.token[data-id="${t.id}"]`)?.remove();
+    document.querySelector(`.token[data-id="${t.id}"]`)?.remove(); // Удаляем старую фишку с тем же id
     const cell = document.querySelector(`.grid-cell[data-x="${t.x}"][data-y="${t.y}"]`);
     if (!cell) return;
     const el = document.createElement('div');
     el.className = 'token';
     el.dataset.id = t.id;
     el.style.background = t.color;
-    el.textContent = t.name[0].toUpperCase();
+    el.textContent = t.name[0].toUpperCase(); // Первая буква имени
     el.draggable = true;
+    // Обработка начала перетаскивания
     el.addEventListener('dragstart', ev => {
       if (selectedTool !== 'hand') { ev.preventDefault(); return; }
       ev.dataTransfer.setData('text/plain', t.id);
@@ -197,6 +213,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     });
     cell.appendChild(el);
   }
+  // Разрешаем drag&drop только в режиме "рука"
   gameGrid.addEventListener('dragover', e => { if (selectedTool === 'hand') e.preventDefault(); });
   gameGrid.addEventListener('drop', e => {
     if (selectedTool !== 'hand') return; e.preventDefault();

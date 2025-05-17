@@ -1,12 +1,20 @@
+<!-- Модальное окно для создания/редактирования фишки -->
 <div id="token-modal" class="fixed inset-0 bg-black bg-opacity-50 hidden items-center justify-center z-50">
+  <!-- Внутренний контейнер модального окна -->
   <div class="bg-white rounded-lg p-6 w-full max-w-sm">
+    <!-- Заголовок модального окна -->
     <h3 class="text-xl font-semibold mb-4">Фишка</h3>
     <div class="space-y-4">
+      <!-- Поле для имени фишки -->
       <div><label class="block mb-1">Имя</label><input id="token-name" type="text" class="w-full p-2 border rounded-md"></div>
+      <!-- Поле для выбора цвета фишки -->
       <div><label class="block mb-1">Цвет</label><input id="token-color" type="color" value="#3b82f6" class="w-16 h-8 border rounded"></div>
+      <!-- Поле для описания фишки -->
       <div><label class="block mb-1">Описание</label><textarea id="token-description" rows="2" class="w-full p-2 border rounded-md"></textarea></div>
+      <!-- Поля для координат фишки -->
       <div><label class="block mb-1">Позиция (X, Y)</label><div class="flex space-x-2"><input id="token-x" type="number" min="0" class="w-1/2 p-2 border rounded"><input id="token-y" type="number" min="0" class="w-1/2 p-2 border rounded"></div></div>
     </div>
+    <!-- Кнопки управления фишкой -->
     <div class="flex justify-between mt-6"><button id="delete-token-btn" class="hidden bg-red-500 text-white px-4 py-2 rounded-md">Удалить</button><div class="space-x-2"><button id="cancel-token-btn" class="bg-gray-300 px-4 py-2 rounded-md">Отмена</button><button id="save-token-btn" class="bg-blue-500 text-white px-4 py-2 rounded-md">Сохранить</button></div></div>
   </div>
 </div> 
