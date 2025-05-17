@@ -1,22 +1,9 @@
 <!-- Секция фишек: создание и список фишек -->
-<div class="flex flex-col md:flex-row gap-4">
-  <div class="bg-white p-4 rounded-lg shadow-md w-full md:w-1/2">
-    <!-- Заголовок секции -->
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">Фишки</h2>
-    <!-- Кнопка для создания новой фишки -->
-    <button id="create-token-btn" class="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 mb-4"><i class="fas fa-plus mr-2"></i>Создать фишку</button>
-    <!-- Список всех фишек -->
-    <div id="token-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
-  </div>
-  <!-- Секция настроек -->
-  <div class="bg-white p-4 rounded-lg shadow-md w-full md:w-1/2 flex flex-col gap-4">
-    <h2 class="text-xl font-semibold mb-4 text-gray-700">Настройки</h2>
-    <button id="save-game-btn" class="w-full bg-blue-500 text-white py-2 px-4 rounded-md hover:bg-blue-600"><i class="fas fa-save mr-2"></i>Сохранить игру</button>
-    <label class="block w-full">
-      <span class="sr-only">Загрузить игру</span>
-      <input id="load-game-input" type="file" accept=".json" class="hidden" />
-      <button id="load-game-btn" class="w-full bg-yellow-500 text-white py-2 px-4 rounded-md hover:bg-yellow-600"><i class="fas fa-upload mr-2"></i>Загрузить игру</button>
-    </label>
-    <button id="back-to-menu-btn" class="w-full bg-gray-500 text-white py-2 px-4 rounded-md hover:bg-gray-600"><i class="fas fa-arrow-left mr-2"></i>Вернуться в меню</button>
-  </div>
+<div class="bg-white p-4 rounded-lg shadow-md flex flex-col h-full overflow-auto">
+  <!-- Заголовок секции -->
+  <h2 class="text-xl font-semibold mb-4 text-gray-700">Фишки</h2>
+  <!-- Кнопка для создания новой фишки -->
+  <button id="create-token-btn" class="w-full bg-green-500 text-white py-2 px-4 rounded-md hover:bg-green-600 mb-4"><i class="fas fa-plus mr-2"></i>Создать фишку</button>
+  <!-- Список всех фишек -->
+  <div id="token-list" class="space-y-2 max-h-60 overflow-y-auto"></div>
 </div> 

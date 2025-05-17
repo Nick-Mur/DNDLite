@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DND_Platform - Врата Приключений</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="../styles.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&display=swap');
+
+        body {
+            font-family: 'MedievalSharp', cursive;
+            background: url('https://images.unsplash.com/photo-1544830288-5a1b0aaf0a1a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1470&q=80') no-repeat center center fixed;
+            background-size: cover;
+            color: #e0d4b7;
+        }
+
+        .parchment {
+            background: url('https://www.transparenttextures.com/patterns/old-paper.png');
+            background-color: #f5e7c1;
+            border: 8px double #8b4513;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+            position: relative;
+        }
+
+        .parchment::before {
+            content: "";
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid #8b4513;
+            pointer-events: none;
+        }
+
+        .d20-btn {
+            position: relative;
+            transition: all 0.3s ease;
+        }
+
+        .d20-btn:hover {
+            transform: translateY(-5px) rotate(5deg);
+            filter: drop-shadow(0 5px 5px rgba(0, 0, 0, 0.3));
+        }
+
+        .d20-btn::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border-radius: 0.5rem;
+            background: linear-gradient(135deg, rgba(255,255,255,0.3) 0%, rgba(255,255,255,0) 50%);
+            pointer-events: none;
+        }
+
+        .input-field {
+            background: rgba(245, 231, 193, 0.8);
+            border: 3px solid #8b4513;
+            color: #5c3a21;
+            font-family: 'MedievalSharp', cursive;
+        }
+
+        .input-field::placeholder {
+            color: #8b4513;
+            opacity: 0.7;
+        }
+
+        .modal-content {
+            animation: fadeIn 0.5s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .dice-roll {
+            animation: diceRoll 1s ease-out;
+        }
+
+        @keyframes diceRoll {
+            0% { transform: rotate(0deg) scale(1); }
+            25% { transform: rotate(90deg) scale(1.2); }
+            50% { transform: rotate(180deg) scale(1); }
+            75% { transform: rotate(270deg) scale(1.2); }
+            100% { transform: rotate(360deg) scale(1); }
+        }
+
+        /* Эффект старинного пергамента */
+        .parchment-effect {
+            position: relative;
+        }
+
+        .parchment-effect::after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(to bottom,
+                rgba(139, 69, 19, 0.1) 0%,
+                rgba(139, 69, 19, 0.2) 50%,
+                rgba(139, 69, 19, 0.1) 100%),
+                url('https://www.transparenttextures.com/patterns/rice-paper.png');
+            mix-blend-mode: multiply;
+            pointer-events: none;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+    <div class="parchment parchment-effect w-full max-w-2xl p-8 md:p-12 rounded-lg">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl md:text-5xl font-bold text-amber-900 mb-2">DND_Platform</h1>
+            <p class="text-xl text-amber-800 italic">"Где рождаются легенды"</p>
+            <div class="mt-4 flex justify-center">
+                <div class="w-16 h-16 bg-amber-700 rounded-full flex items-center justify-center text-amber-100 text-2xl border-4 border-amber-900">
+                    <i class="fas fa-dice-d20"></i>
+                </div>
+            </div>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Кнопка "О платформе" -->
+            <button onclick="openModal('about')" class="d20-btn w-full py-4 px-6 bg-amber-700 hover:bg-amber-600 text-amber-100 text-xl font-bold rounded-lg flex items-center justify-center space-x-3">
+                <i class="fas fa-scroll text-2xl"></i>
+                <span>О Платформе</span>
+            </button>
+
+            <!-- Кнопка "Создать комнату" -->
+            <button id="create-room-btn" class="d20-btn w-full py-4 px-6 bg-emerald-800 hover:bg-emerald-700 text-amber-100 text-xl font-bold rounded-lg flex items-center justify-center space-x-3">
+                <i class="fas fa-plus-circle text-2xl"></i>
+                <span>Создать Комнату</span>
+            </button>
+
+            <!-- Поле для подключения к комнате (временно не работает) -->
+            <div class="relative">
+                <input type="text" id="roomCode" placeholder="(временно не работает) Введите код комнаты..." class="input-field w-full py-4 px-6 text-xl rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-700" disabled>
+                <button class="d20-btn absolute right-2 top-1/2 transform -translate-y-1/2 bg-red-800 text-amber-100 py-2 px-4 rounded-lg flex items-center opacity-50 cursor-not-allowed" disabled>
+                    <i class="fas fa-door-open mr-2"></i>
+                    Войти
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-8 text-center text-sm text-amber-800">
+            <p>Готов к приключениям, искатель?</p>
+        </div>
+    </div>
+
+    <!-- Модальное окно "О платформе" -->
+    <div id="aboutModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 hidden">
+        <div class="parchment parchment-effect max-w-md w-full p-8 rounded-lg modal-content">
+            <div class="flex justify-between items-start mb-4">
+                <h2 class="text-3xl font-bold text-amber-900">О Платформе</h2>
+                <button onclick="closeModal('about')" class="text-amber-900 hover:text-amber-700 text-2xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="text-amber-900 space-y-4">
+                <p>DND_Platform - это цифровой стол для настольных ролевых игр в стиле Dungeons & Dragons.</p>
+                <p>Здесь вы можете создавать свои собственные приключения, присоединяться к кампаниям других Мастеров и погружаться в мир фэнтези.</p>
+                <p>Наша платформа включает в себя:</p>
+                <ul class="list-disc pl-5 space-y-2">
+                    <li>Интерактивные карты</li>
+                    <li>Систему бросков кубиков</li>
+                    <li>Чат для игроков</li>
+                    <li>Характеристики персонажей</li>
+                    <li>Библиотеку заклинаний и предметов</li>
+                </ul>
+            </div>
+            <div class="mt-6 flex justify-center">
+                <button onclick="closeModal('about')" class="d20-btn bg-amber-700 hover:bg-amber-600 text-amber-100 py-2 px-6 rounded-lg">
+                    Понятно
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Модальное окно "Создать комнату" -->
+    <!-- Удалено полностью -->
+
+    <script type="module" src="../js/menu.js"></script>
+</body>
+</html>

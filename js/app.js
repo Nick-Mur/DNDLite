@@ -7,10 +7,11 @@ import { setActiveTool } from './toolbar.js';
 import { createGlobalTokenTooltip } from './tokenTooltip.js';
 
 window.addEventListener('DOMContentLoaded', async () => {
-  await loadSection('html/tools.html', 'tools-section');
+  await loadSection('html/settings.html', 'settings-section');
   await loadSection('html/dice.html', 'dice-section');
-  await loadSection('html/tokens.html', 'main-content');
-  await loadSection('html/field.html', 'main-content');
+  await loadSection('html/tokens.html', 'tokens-section');
+  await loadSection('html/tools.html', 'tools-section');
+  await loadSection('html/field.html', 'field-section');
   await loadSection('html/token-modal.html', 'modals');
 
   initApp();
