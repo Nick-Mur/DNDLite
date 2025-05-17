@@ -55,24 +55,85 @@
 
 /* ===== КУБИК ===== */
 .dice-face{
-  width:90px; height:90px; /* Размер кубика */
-  border-radius:10px; /* Скругление углов */
-  display:flex; align-items:center; justify-content:center; /* Центрирование */
-  background:#e0eaff; /* Светло-синий фон */
-  color:#1d4ed8; /* Синий текст */
-  font:700 36px/1 system-ui; /* Крупный жирный текст */
-  box-shadow:0 2px 5px rgba(0,0,0,.2); /* Тень */
-  cursor:pointer; /* Курсор "рука" */
-  transition:transform .2s; /* Плавное увеличение при наведении */
+  width:100px; height:100px; /* Увеличенный размер */
+  border-radius:18px; /* Более выраженное скругление */
+  display:flex; align-items:center; justify-content:center;
+  background:linear-gradient(145deg,#f7f7f7 60%,#e0eaff 100%); /* Матовый белый фон по умолчанию */
+  color:#222; /* Тёмный текст */
+  font:900 44px/1.1 'Segoe UI',system-ui,sans-serif;
+  box-shadow:0 6px 32px 0 rgba(30,64,175,0.18), 0 2px 0 #fff inset, 0 0 0 4px #bbb inset; /* Глубокая тень + внутренняя рамка */
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  transition:transform .2s, box-shadow .2s, background .3s;
 }
-.dice-face:hover{transform:scale(1.05);} /* Эффект увеличения при наведении */
-.dice-center{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;} /* Центрирование содержимого кубика */
+.dice-face:hover{
+  transform:scale(1.10) rotate(-2deg);
+  box-shadow:0 12px 40px 0 rgba(30,64,175,0.28), 0 3px 0 #fff inset, 0 0 0 6px #bbb inset;
+}
+.dice-face:active{
+  animation: dice-flash 0.25s;
+}
+@keyframes dice-flash {
+  0% { filter:brightness(1.7) drop-shadow(0 0 24px #fff); }
+  100% { filter:none; }
+}
 
-/* Разные формы кубика с помощью clip-path */
-.dice-face--d4    { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); } /* Треугольник (d4) */
-.dice-face--d6    { clip-path: inset(0% round 10px); } /* Квадрат (d6) */
-.dice-face--d8    { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); } /* Ромб (d8) */
-.dice-face--d10   { clip-path: polygon(50% 0%, 95% 30%, 80% 100%, 20% 100%, 5% 30%); } /* Пятиугольник (d10) */
-.dice-face--d12   { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); } /* Шестиугольник (d12) */
-.dice-face--d20   { clip-path: polygon(50% 0%, 80% 10%, 100% 40%, 90% 80%, 60% 100%, 40% 100%, 10% 80%, 0% 40%, 20% 10%); } /* Восьмиугольник (d20) */
-.dice-face--d100  { clip-path: circle(50% at 50% 50%); } /* Круг (d100) */ 
+/* Блик (отблеск) поверх кубика */
+.dice-face::before {
+  content:'';
+  position:absolute; left:0; top:0; width:100%; height:100%;
+  background:linear-gradient(120deg,rgba(255,255,255,0.45) 0%,rgba(255,255,255,0.08) 60%,rgba(255,255,255,0) 100%);
+  pointer-events:none;
+  z-index:2;
+}
+
+/* SVG-рамка с гранями для объёма (кроме d6) */
+.dice-face:not(.dice-face--d6)::after {
+  content:'';
+  position:absolute; left:0; top:0; width:100%; height:100%;
+  pointer-events:none; z-index:3;
+  background-repeat:no-repeat; background-position:center; background-size:90% 90%;
+}
+.dice-face--d4::after    { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,10 90,90 10,90" fill="none" stroke="%23bbb" stroke-width="3"/><polygon points="50,10 90,90 10,90" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+.dice-face--d8::after    { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="%23bbb" stroke-width="3"/><polygon points="50,10 90,50 50,90 10,50" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+.dice-face--d10::after   { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,10 90,35 80,90 20,90 10,35" fill="none" stroke="%23bbb" stroke-width="3"/><polygon points="50,10 90,35 80,90 20,90 10,35" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+.dice-face--d12::after   { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,10 85,25 95,60 75,90 25,90 5,60 15,25" fill="none" stroke="%23bbb" stroke-width="3"/><polygon points="50,10 85,25 95,60 75,90 25,90 5,60 15,25" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+.dice-face--d20::after   { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><polygon points="50,10 80,20 95,50 80,80 50,90 20,80 5,50 20,20" fill="none" stroke="%23bbb" stroke-width="3"/><polygon points="50,10 80,20 95,50 80,80 50,90 20,80 5,50 20,20" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+.dice-face--d100::after  { background-image:url('data:image/svg+xml;utf8,<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="45" fill="none" stroke="%23bbb" stroke-width="3"/><circle cx="50" cy="50" r="45" fill="none" stroke="%23fff" stroke-width="1"/></svg>'); }
+
+/* D6 — классический стиль: белый фон, чёрная рамка, точки (pip) */
+.dice-face--d6 {
+  background:#fff;
+  border:2.5px solid #222;
+  box-shadow:0 6px 32px 0 rgba(30,64,175,0.18), 0 2px 0 #fff inset, 0 0 0 4px #bbb inset, 0 0 0 2.5px #222;
+}
+.dice-face--d6 span {
+  color:#222;
+  font-size:0; /* Скрываем число, точки будут через JS */
+}
+.dice-pip {
+  position:absolute;
+  width:18px; height:18px;
+  background:#222;
+  border-radius:50%;
+  z-index:4;
+}
+
+/* Разные цвета и градиенты для разных типов кубиков */
+.dice-face--d4    { background:linear-gradient(135deg,#fbeee6 60%,#f7c59f 100%); color:#b45309; }
+.dice-face--d6    { background:linear-gradient(135deg,#e0eaff 60%,#b6c7f7 100%); color:#1d4ed8; }
+.dice-face--d8    { background:linear-gradient(135deg,#e6fbe9 60%,#9ff7b0 100%); color:#059669; }
+.dice-face--d10   { background:linear-gradient(135deg,#fbe6f6 60%,#f79fd6 100%); color:#be185d; }
+.dice-face--d12   { background:linear-gradient(135deg,#e6f7fb 60%,#9fdaf7 100%); color:#0369a1; }
+.dice-face--d20   { background:linear-gradient(135deg,#fbe6e6 60%,#f79f9f 100%); color:#b91c1c; }
+.dice-face--d100  { background:linear-gradient(135deg,#f3e6fb 60%,#c99ff7 100%); color:#7c3aed; }
+
+/* Формы кубиков (clip-path) — не меняем */
+.dice-face--d4    { clip-path: polygon(50% 0%, 100% 100%, 0% 100%); }
+.dice-face--d6    { clip-path: inset(0% round 16px); }
+.dice-face--d8    { clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%); }
+.dice-face--d10   { clip-path: polygon(50% 0%, 95% 30%, 80% 100%, 20% 100%, 5% 30%); }
+.dice-face--d12   { clip-path: polygon(50% 0%, 90% 20%, 100% 60%, 75% 100%, 25% 100%, 0% 60%, 10% 20%); }
+.dice-face--d20   { clip-path: polygon(50% 0%, 80% 10%, 100% 40%, 90% 80%, 60% 100%, 40% 100%, 10% 80%, 0% 40%, 20% 10%); }
+.dice-face--d100  { clip-path: circle(50% at 50% 50%); } 

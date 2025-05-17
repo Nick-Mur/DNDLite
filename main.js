@@ -303,6 +303,34 @@ window.addEventListener('DOMContentLoaded', async () => {
   }
 
   // ======= DICE =======
+  // Функция для отрисовки pip (точек) на d6
+  function renderD6Pips(value) {
+    // Удаляем старые точки
+    diceFace.querySelectorAll('.dice-pip').forEach(e=>e.remove());
+    // Координаты pip (относительно 100x100)
+    const pos = [
+      [20,20],[50,20],[80,20],
+      [20,50],[50,50],[80,50],
+      [20,80],[50,80],[80,80]
+    ];
+    // Для каждого значения d6 — какие pip рисовать
+    const pipMap = {
+      1: [4],
+      2: [0,8],
+      3: [0,4,8],
+      4: [0,2,6,8],
+      5: [0,2,4,6,8],
+      6: [0,2,3,5,6,8]
+    };
+    (pipMap[value]||[]).forEach(idx=>{
+      const pip = document.createElement('div');
+      pip.className = 'dice-pip';
+      pip.style.left = `calc(${pos[idx][0]}% - 9px)`;
+      pip.style.top  = `calc(${pos[idx][1]}% - 9px)`;
+      diceFace.appendChild(pip);
+    });
+  }
+
   function renderDiceFace(value = '?') {
     const type = diceSelect.value;
     const typeClass = {
@@ -315,9 +343,17 @@ window.addEventListener('DOMContentLoaded', async () => {
       '100': 'dice-face--d100',
     }[type] || '';
     // Удаляем все dice-face--* классы
-    diceFace.className = 'dice-face bg-blue-100 text-blue-800';
+    diceFace.className = 'dice-face';
     if (typeClass) diceFace.classList.add(typeClass);
-    diceFace.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font:700 36px/1 system-ui;color:#1d4ed8;">${value}</span>`;
+    // D6 — точки, остальные — число
+    if(type==='6' && value!=='?') {
+      diceFace.innerHTML = '<span></span>';
+      renderD6Pips(Number(value));
+    } else {
+      diceFace.innerHTML = `<span style="display:flex;align-items:center;justify-content:center;width:100%;height:100%;font:900 44px/1.1 'Segoe UI',system-ui,sans-serif;">${value}</span>`;
+      // Удаляем точки, если были
+      diceFace.querySelectorAll('.dice-pip').forEach(e=>e.remove());
+    }
   }
 
   function rollDice(){
