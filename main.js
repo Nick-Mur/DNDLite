@@ -7,9 +7,9 @@ async function loadSection(url, containerId) {
 // Загружаем все секции после загрузки DOM
 window.addEventListener('DOMContentLoaded', async () => {
   // Основные секции
-  await loadSection('tools.html', 'main-content');
-  await loadSection('dice.html', 'main-content');
   await loadSection('tokens.html', 'main-content');
+  await loadSection('dice.html', 'main-content');
+  await loadSection('tools.html', 'main-content');
   await loadSection('field.html', 'main-content');
   // Модальные окна
   await loadSection('token-modal.html', 'modals');
@@ -50,6 +50,10 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // ======= GRID =======
   function key(x, y) { return `${x}_${y}`; }
+
+  function isOccupied(x, y, exclude = null) {
+    return tokens.some(t => t.x === x && t.y === y && t.id !== exclude);
+  }
 
   function setActiveTool(tool) {
     selectedTool = tool;
@@ -120,6 +124,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // ======= TOKENS =======
   function redrawTokens() {
+    document.querySelectorAll('.token').forEach(e => e.remove());
     tokens.forEach(placeToken);
   }
   function placeToken(t) {
@@ -143,7 +148,9 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (selectedTool !== 'hand') return; e.preventDefault();
     const id = e.dataTransfer.getData('text/plain'); const tok = tokens.find(t => t.id === id);
     const cell = e.target.closest('.grid-cell'); if (!(tok && cell)) return;
-    tok.x = parseInt(cell.dataset.x); tok.y = parseInt(cell.dataset.y);
+    const newX = parseInt(cell.dataset.x); const newY = parseInt(cell.dataset.y);
+    if (isOccupied(newX, newY, id)) { alert('В этой клетке уже есть фишка'); return; }
+    tok.x = newX; tok.y = newY;
     redrawTokens(); refreshTokenList();
   });
 
@@ -177,6 +184,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     const color = tokenColorInput.value;
     const x = parseInt(tokenXInput.value), y = parseInt(tokenYInput.value);
     if (x<0||y<0||x>=gridSize||y>=gridSize) return alert('Вне поля');
+    if (isOccupied(x, y, currentTokenId)) return alert('В этой клетке уже есть фишка');
     const desc = tokenDescInput.value.trim();
     if (currentTokenId) {
       Object.assign(tokens.find(t=>t.id===currentTokenId),{name,color,description:desc,x,y});
