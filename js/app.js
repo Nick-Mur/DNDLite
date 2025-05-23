@@ -1,4 +1,3 @@
-// app.js — точка входа, связывает все модули
 import { loadSection } from './loader.js';
 import { buildGrid, paintCell, MAX_GRID_SIZE, cellColors } from './grid.js';
 import { tokens, isOccupied, redrawTokens, placeToken, refreshTokenList, highlightTokenOnField, enableTokenDragAndDrop } from './tokens.js';
@@ -181,7 +180,7 @@ function initApp() {
   window.selectedTool = selectedTool;
   enableTokenDragAndDrop(gameGrid, tokens, gridSize, redrawTokens, () => refreshTokenList(tokenList, openTokenModal, highlightTokenOnField));
 
-  // Сохранить игру
+  // Сохранить игру: экспорт текущего состояния в JSON-файл
   if (saveGameBtn) {
     saveGameBtn.addEventListener('click', () => {
       const state = {
@@ -203,7 +202,7 @@ function initApp() {
     });
   }
 
-  // Загрузить игру
+  // Загрузить игру: импорт состояния из JSON-файла
   if (loadGameBtn && loadGameInput) {
     loadGameBtn.addEventListener('click', () => loadGameInput.click());
     loadGameInput.addEventListener('change', e => {
@@ -213,19 +212,27 @@ function initApp() {
       reader.onload = evt => {
         try {
           const state = JSON.parse(evt.target.result);
+          // Очистка текущего состояния
+          cellColors.clear();
+          tokens.length = 0;
+          document.querySelectorAll('.grid-cell').forEach(c => c.style.background = '');
+          
+          // Восстановление размера сетки
           if (typeof state.gridSize === 'number') {
             gridSizeInput.value = state.gridSize;
             gridSize = state.gridSize;
           }
+          // Восстановление цветов клеток
           if (Array.isArray(state.cellColors)) {
-            cellColors.clear();
             for (const [key, value] of state.cellColors) cellColors.set(key, value);
           }
+          // Восстановление фишек
           if (Array.isArray(state.tokens)) {
-            tokens.length = 0;
             for (const t of state.tokens) tokens.push(t);
           }
+          // Восстановление типа кубика
           if (state.dice) diceSelect.value = state.dice;
+          // Перестроение сетки и восстановление состояния
           buildGrid(gameGrid, gridSize, ()=>{
             // Восстановление рисунков
             if (Array.isArray(state.cellColors)) {
@@ -251,7 +258,7 @@ function initApp() {
     });
   }
 
-  // Вернуться в меню
+  // Вернуться в меню: скрыть основной интерфейс и показать стартовый экран
   if (backToMenuBtn && menuScreen && mainApp) {
     backToMenuBtn.addEventListener('click', () => {
       mainApp.style.display = 'none';
